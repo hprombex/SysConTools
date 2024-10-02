@@ -321,9 +321,6 @@ class SSHConnection:
         verify_cmd(cmd)
         cmd = adjust_cmd(cmd, docker_container, self._enable_sudo)
 
-        if not quiet_mode:
-            self.log.debug(f'Host: {self._ip} cmd: "{cmd}" cwd: {cwd}')
-
         proc = self.run_process(
             cmd=cmd,
             bufsize=-1,
@@ -334,6 +331,7 @@ class SSHConnection:
             stderr_to_stdout=False,
             hide_stdout=False,
             hide_stderr=False,
+            quiet_mode=quiet_mode,
         )
 
         stdout, stderr = None, None
@@ -411,9 +409,7 @@ class SSHConnection:
             self._enable_sudo = True
 
         if not quiet_mode:
-            self.log.debug(
-                f'Starting process on host:: {self._ip}  cmd: "{cmd}" cwd: {cwd}'
-            )
+            self.log.debug(f'Host: {self._ip}  cmd: "{cmd}" cwd: {cwd}')
 
         verify_cmd(cmd)
 

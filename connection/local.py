@@ -272,9 +272,7 @@ class LocalConnection:
                is not supported, so SHELL mode is enforced.
         """
         if not quiet_mode:
-            self.log.debug(
-                f'Starting process on host:: {self._ip}  cmd: "{cmd}" cwd: {cwd}'
-            )
+            self.log.debug(f'Host: {self._ip}  cmd: "{cmd}" cwd: {cwd}')
 
         if cwd and self._host_os_type == OsType.WINDOWS:
             # Windows does not support non-shell mode or changing the working
