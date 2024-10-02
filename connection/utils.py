@@ -10,7 +10,7 @@
 #
 # Author: hprombex
 
-"""Tools for SSH connection and Local connection."""
+"""Utils for SSH connection and Local connection."""
 
 import codecs
 from dataclasses import dataclass
