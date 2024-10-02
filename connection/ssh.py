@@ -38,7 +38,7 @@ from exceptions import (
     UnsupportedOSException,
 )
 from lsLog import Log
-from connection.tools import (
+from connection.utils import (
     Proc,
     ExeProc,
     adjust_cmd,

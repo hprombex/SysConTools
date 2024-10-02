@@ -18,7 +18,7 @@ subscribing, and receiving.
 import uuid
 from time import sleep
 import paho.mqtt.client as mqtt
-from connection.tools import check_connection, ReceiveMessage, Subscription
+from connection.utils import check_connection, ReceiveMessage, Subscription
 from exceptions import MqttConnectionError
 from lsLog import Log
 

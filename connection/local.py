@@ -22,7 +22,7 @@ import shlex
 from importlib import import_module
 from subprocess import PIPE, STDOUT, run, Popen, CompletedProcess
 
-from connection.tools import (
+from connection.utils import (
     adjust_cmd,
     OsType,
     Proc,
