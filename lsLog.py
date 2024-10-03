@@ -133,6 +133,7 @@ class Log:
         text: str,
         txt_color: str = "white",
         bg_color: str = None,
+        exc_info: bool = False,
     ) -> None:
         """
         Logs a message at a given level with optional text and background colors.
@@ -141,6 +142,7 @@ class Log:
         :param text: The message to log.
         :param txt_color: Color of the text for console output (default is "white").
         :param bg_color: Background color for console output.
+        :param exc_info: For a full stack trace.
         """
         colored_text = colored(
             text,
@@ -148,7 +150,7 @@ class Log:
             on_color=bg_color if bg_color else None,
         )
 
-        self.logger.log(level, colored_text)
+        self.logger.log(level, colored_text, exc_info=exc_info)
 
     def info(self, text: str) -> None:
         """
@@ -174,29 +176,23 @@ class Log:
         """
         self.log(logging.WARNING, text, txt_color="light_yellow")
 
-    def fail(self, text: str) -> None:
+    def fail(self, text: str, exc_info: bool = False) -> None:
         """
         Logs a failure message at the error level.
 
+        :param exc_info: For a full stack trace.
         :param text: The message to log.
         """
-        self.log(logging.ERROR, text, txt_color="light_red")
+        self.log(logging.ERROR, text, txt_color="light_red", exc_info=exc_info)
 
-    def others(self, text: str) -> None:
-        """
-        Logs a other messages.
-
-        :param text: The message to log.
-        """
-        self.log(logging.DEBUG, text, txt_color="light_cyan")
-
-    def debug(self, text: str) -> None:
+    def debug(self, text: str, exc_info: bool = False) -> None:
         """
         Logs a debug message.
 
+        :param exc_info: For a full stack trace.
         :param text: The message to log.
         """
-        self.log(logging.DEBUG, text, txt_color="light_blue")
+        self.log(logging.DEBUG, text, txt_color="light_blue", exc_info=exc_info)
 
     def out(self, text: str) -> None:
         """
@@ -204,7 +200,7 @@ class Log:
 
         :param text: The message to log.
         """
-        self.log(logging.DEBUG, text, txt_color="light_magenta")
+        self.log(logging.DEBUG, text, txt_color="light_cyan")
 
     def blocked(self, text: str) -> None:
         """
@@ -220,25 +216,37 @@ class Log:
 
         :param text: The message to log.
         """
-        self.log(logging.INFO, text, txt_color="light_cyan")
+        self.log(logging.INFO, text, txt_color="light_magenta")
 
-    def error(self, text: str) -> None:
+    def error(self, text: str, exc_info: bool = False) -> None:
         """
         Logs an error message with a specific background color.
 
+        :param exc_info: For a full stack trace.
         :param text: The message to log.
         """
         self.log(
-            logging.ERROR, text, txt_color="white", bg_color="on_light_red"
+            logging.ERROR,
+            text,
+            txt_color="white",
+            bg_color="on_light_red",
+            exc_info=exc_info,
         )
 
-    def exception(self, text: str) -> None:
+    def exception(self, text: str, exc_info: bool = False) -> None:
         """
         Logs an exception message with a specific background color.
 
+        :param exc_info: For a full stack trace.
         :param text: The message to log.
         """
-        self.log(logging.ERROR, text, txt_color="white", bg_color="on_magenta")
+        self.log(
+            logging.ERROR,
+            text,
+            txt_color="white",
+            bg_color="on_magenta",
+            exc_info=exc_info,
+        )
 
     def _create_dir(self, directory: str) -> None:
         """
