@@ -58,3 +58,7 @@ class CmdValidationError(Exception):
 
 class MqttConnectionError(Exception):
     """Exception raised when an error occurs during the MQTT connection process."""
+
+
+class PingException(Exception):
+    """Handle pinging exceptions."""
