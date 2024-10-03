@@ -122,6 +122,7 @@ class LocalConnection:
         shell: bool = False,
         quiet_mode: bool = True,
         docker_container: str = None,
+        **kwargs,
     ) -> ExeProc:
         """
         Execute a command on the local system and capture the output.
@@ -140,6 +141,9 @@ class LocalConnection:
         :param quiet_mode: If True, suppresses command output from being logged.
         :param docker_container: If specified, the command will be run
             inside the given Docker container.
+        :param kwargs: Additional optional keyword arguments.
+            These can be used for passing environment variables, custom shell options,
+            or other execution flags.
         :return: An ExeProc object containing stdout, stderr, and the
             return code of the executed process.
         """
