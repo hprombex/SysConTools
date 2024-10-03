@@ -299,8 +299,9 @@ class SSHConnection:
         cwd: str = None,
         timeout: int = None,
         sudo: bool = False,
-        quiet_mode: bool = False,
+        quiet_mode: bool = True,
         docker_container: str = None,
+        **kwargs,
     ) -> ExeProc:
         """
         Run a command, optionally with sudo, inside a specified directory,
@@ -312,6 +313,9 @@ class SSHConnection:
         :param sudo: Whether to execute the command with elevated privileges (sudo).
         :param quiet_mode: If True, suppress all command outputs and log messages.
         :param docker_container: If provided, the command will be executed inside the specified Docker container.
+        :param kwargs: Additional optional keyword arguments.
+            These can be used for passing environment variables, custom shell options,
+            or other execution flags.
         :return: An ExeProc object containing the standard output,
                  standard error, and the return code of the command.
         """
