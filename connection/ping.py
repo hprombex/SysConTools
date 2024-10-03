@@ -12,6 +12,8 @@
 
 """Ping utility for network connectivity testing."""
 
+from __future__ import annotations
+
 import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -34,6 +36,7 @@ class PingResult:
     :param packets_transmitted: The total number of packets sent during the ping operation.
     :param packets_received: The total number of packets received in response to the ping requests.
     """
+
     pass_count: int
     fail_count: int
     packets_transmitted: int = None
@@ -41,9 +44,20 @@ class PingResult:
 
 
 class Ping:
-    """A class for performing ping operations over a network."""
+    """
+    A class for performing ping operations over a network.
 
-    def __init__(self, connection: SSHConnection | LocalConnection, logger: Log = None):
+    Example:
+    >>>con = LocalConnection()
+    >>>ping = Ping(con)
+    >>>result = ping.run("1.1.1.1", count=2)
+    >>>print(result)
+    >>>"PingResult(pass_count=2, fail_count=0, packets_transmitted=2, packets_received=2)"
+    """
+
+    def __init__(
+        self, connection: SSHConnection | LocalConnection, logger: Log = None
+    ):
         """
         Initialize the Ping instance.
 
@@ -113,7 +127,8 @@ class Ping:
         if match:
             return PingResult(
                 pass_count=int(match.group("packets_received")),
-                fail_count=int(match.group("packets_transmitted")) - int(match.group("packets_received")),
+                fail_count=int(match.group("packets_transmitted"))
+                - int(match.group("packets_received")),
                 packets_transmitted=int(match.group("packets_transmitted")),
                 packets_received=int(match.group("packets_received")),
             )
@@ -131,8 +146,8 @@ class Ping:
         """
         if "General failure" in output:
             raise PingException(
-                f'Cannot ping host due to "General failure" error, '
-                f'ping output: \n{output}'
+                f"Cannot ping host due to 'General failure' error, "
+                f"ping output: \n{output}"
             )
 
         if "Ping statistics" not in output:
@@ -146,7 +161,9 @@ class Ping:
         if count_match:
             transmitted = int(count_match.group("transmitted_count"))
             received = int(count_match.group("received_count"))
-            received -= len(re.findall("Destination host unreachable.", output))
+            received -= len(
+                re.findall("Destination host unreachable.", output)
+            )
 
             return PingResult(
                 pass_count=received,
