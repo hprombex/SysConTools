@@ -24,13 +24,15 @@ from datetime import datetime
 from termcolor import colored
 from colorama import init
 
+from lsLog_singleton import LogSingleton
+
 # Initialize colorama
 # With colorama initialized, it will enable the ANSI escape sequences for
 # colored output in Windows CMD and PowerShell.
 init(autoreset=True)
 
 
-class Log:
+class Log(metaclass=LogSingleton):
     """
     A custom logger with support for file logging and colored console output
     using the termcolor module.
