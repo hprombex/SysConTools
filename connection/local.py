@@ -17,10 +17,9 @@ This module defines the LocalConnection class, which provides functionality for
 executing commands and operations directly on the local machine.
 """
 
-import re
 import shlex
 from importlib import import_module
-from subprocess import PIPE, STDOUT, run, Popen, CompletedProcess
+from subprocess import PIPE, STDOUT, Popen
 
 from connection.utils import (
     adjust_cmd,
@@ -81,13 +80,13 @@ class LocalConnection:
 
         self._ip: str = str(ip)
         self._module: AutoImportModule | None = None
-        self.__use_sudo: bool = False
+        self._enable_sudo: bool = False
         self._host_os_type: OsType = self.get_host_os_type()
 
     def __repr__(self):
         return (
             f"LocalConnection(ip={self._ip!r}, os_type={self._host_os_type!r}, "
-            f"use_sudo={self.__use_sudo})"
+            f"enable_sudo={self._enable_sudo})"
         )
 
     def __str__(self):
@@ -114,15 +113,15 @@ class LocalConnection:
         self,
         cmd: str,
         *,
-        input_data: str = None,
         cwd: str = None,
         timeout: int = None,
+        sudo: bool = False,
         env: dict[str, str] = None,
         stderr_to_stdout: bool = False,
         shell: bool = False,
         quiet_mode: bool = True,
         docker_container: str = None,
-        **kwargs,
+        **kwargs,  # todo add catch kwargs
     ) -> ExeProc:
         """
         Execute a command on the local system and capture the output.
@@ -132,7 +131,7 @@ class LocalConnection:
         directory specification, environment variables, and output redirection.
 
         :param cmd: The command to be executed.
-        :param input_data: Input data to pass to the command's stdin.
+        :param sudo: Whether to execute the command with elevated privileges (sudo).
         :param cwd: The working directory in which to run the command.
         :param timeout: Time in seconds before the command times out.
         :param env: Environment variables to use during command execution.
@@ -147,9 +146,12 @@ class LocalConnection:
         :return: An ExeProc object containing stdout, stderr, and the
             return code of the executed process.
         """
+        if sudo:
+            self._enable_sudo = True
+
         is_powershell = "powershell" in cmd
         cmd = adjust_cmd(
-            cmd, docker_container, False if is_powershell else self.__use_sudo
+            cmd, docker_container, False if is_powershell else self._enable_sudo
         )
 
         if not quiet_mode:
@@ -161,32 +163,32 @@ class LocalConnection:
         if not shell and not is_powershell:
             cmd = shlex.split(cmd, posix=self._host_os_type == OsType.LINUX)
 
-        proc: CompletedProcess = run(
+        proc: Popen = Popen(
             cmd,
-            input=input_data,
             cwd=cwd,
-            timeout=timeout,
             env=env,
             shell=shell,
             stdout=STDOUT if stderr_to_stdout else PIPE,
             stderr=PIPE,
-            check=False,
+            start_new_session=True,
         )
+        proc.wait(timeout=timeout)
 
-        new_line_pattern = b"(\r\n|\r)"
+        stdout, stderr = proc.communicate(timeout=timeout)
         decoded_stdout = decoded_stderr = ""
 
-        if proc.stdout:
-            stdout = re.sub(new_line_pattern, b"\n", proc.stdout)
+        if stdout:
             decoded_stdout = stdout.decode("utf-8", "ignore")
             if decoded_stdout and not quiet_mode:
                 self.log.out(f"output: \nstdout>>\n{decoded_stdout}")
 
-        if proc.stderr:
-            stderr = re.sub(new_line_pattern, b"\n", proc.stderr)
+        if stderr:
             decoded_stderr = stderr.decode("utf-8", "ignore")
             if decoded_stderr and not quiet_mode:
                 self.log.out(f"output: \nstderr>>\n{decoded_stderr}")
+
+        if sudo:
+            self._enable_sudo = False
 
         return ExeProc(
             stdout=decoded_stdout,
