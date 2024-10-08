@@ -14,7 +14,7 @@
 
 import codecs
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from subprocess import CompletedProcess, Popen
 
 from paramiko.channel import ChannelFile, Channel
@@ -22,7 +22,7 @@ from paramiko.channel import ChannelFile, Channel
 from exceptions import CmdValidationError
 
 
-class OsType(str, Enum):
+class OsType(StrEnum):
     """
     An enumeration representing the different operating system types.
 
@@ -130,6 +130,26 @@ def check_connection(func):
     def wrapper(self, *args, **kwargs):
         if not self.connected:
             self.connect()
+        result = func(self, *args, **kwargs)
+        return result
+
+    return wrapper
+
+
+def is_root_available(func):
+    """
+    Decorator that checks if root permissions are available before executing a function.
+    If root privileges are not available, a warning is logged.
+
+    :param func: The function to be decorated.
+    :return: The result of the decorated function, even if root permissions are not available.
+    """
+
+    def wrapper(self, *args, **kwargs):
+        if not self.root_permissions:
+            self.log.warning(
+                f"Root privileges are required to call {func.__name__} correctly."
+            )
         result = func(self, *args, **kwargs)
         return result
 
