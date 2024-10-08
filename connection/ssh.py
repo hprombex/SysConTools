@@ -301,7 +301,7 @@ class SSHConnection:
         sudo: bool = False,
         quiet_mode: bool = True,
         docker_container: str = None,
-        **kwargs,
+        **kwargs,  # todo add catch kwargs
     ) -> ExeProc:
         """
         Run a command, optionally with sudo, inside a specified directory,
