@@ -24,7 +24,7 @@ from datetime import datetime
 from termcolor import colored
 from colorama import init
 
-from lsLog_singleton import LogSingleton
+from lsLog_metaclass import LogMetaclass
 
 # Initialize colorama
 # With colorama initialized, it will enable the ANSI escape sequences for
@@ -32,7 +32,7 @@ from lsLog_singleton import LogSingleton
 init(autoreset=True)
 
 
-class Log(metaclass=LogSingleton):
+class Log(metaclass=LogMetaclass):
     """
     A custom logger with support for file logging and colored console output
     using the termcolor module.

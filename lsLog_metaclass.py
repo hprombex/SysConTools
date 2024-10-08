@@ -10,10 +10,10 @@
 #
 # Author: hprombex
 
-"""Log Singleton"""
+"""Log Metaclass"""
 
 
-class LogSingleton(type):
+class LogMetaclass(type):
     """
     Metaclass for implementing the Singleton pattern with optional app_name handling.
     Ensures that only one instance of a class using this metaclass can be created.
@@ -21,7 +21,7 @@ class LogSingleton(type):
     unique per app_name; otherwise, a single instance will be shared across the class.
 
     Example:
-    >>> class Logger(metaclass=LogSingleton):
+    >>> class Logger(metaclass=LogMetaclass):
     ...     def __init__(self, app_name=None):
     ...         self.app_name = app_name
     ...
@@ -42,12 +42,12 @@ class LogSingleton(type):
         the key for creating unique singleton instances per app. Otherwise, ensures a single
         instance is created for the class itself.
 
-        :return: The singleton instance of the class or app-specific instance if 'app_name' is provided.
+        :return: The instance of the class or app-specific instance if 'app_name' is provided.
         """
-        app_name = kwargs.get("app_name")  # for app-specific singleton instances
-        singleton_key = app_name if app_name else cls
+        app_name = kwargs.get("app_name")  # for app-specific instances
+        instance_key = app_name if app_name else cls
 
-        if singleton_key not in cls._instances:
-            cls._instances[singleton_key] = super(LogSingleton, cls).__call__(*args, **kwargs)
+        if instance_key not in cls._instances:
+            cls._instances[instance_key] = super(LogMetaclass, cls).__call__(*args, **kwargs)
 
-        return cls._instances[singleton_key]
+        return cls._instances[instance_key]
