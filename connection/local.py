@@ -151,7 +151,9 @@ class LocalConnection:
 
         is_powershell = "powershell" in cmd
         cmd = adjust_cmd(
-            cmd, docker_container, False if is_powershell else self._enable_sudo
+            cmd,
+            docker_container,
+            False if is_powershell else self._enable_sudo,
         )
 
         if not quiet_mode:
