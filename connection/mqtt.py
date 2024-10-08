@@ -76,10 +76,15 @@ class MQTTClient:
         else:
             self.log = Log(store=False, timestamp=True)
 
-        base62 = getattr(mqtt, "_base62")
+        try:
+            base62 = getattr(mqtt, "_base62")
+        except AttributeError:
+            # support for older version of paho mqtt
+            base62 = mqtt.base62
+
         self.client_id = base62(uuid.uuid4().int, padding=22)
         self.client = mqtt.Client(
-            client_id=self.client_id, protocol=protocol, callback_api_version=2
+            client_id=self.client_id, protocol=protocol
         )
         self.client.username_pw_set(self.username, self.password)
 
