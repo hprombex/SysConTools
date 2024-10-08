@@ -35,8 +35,8 @@ class HomeAssistantError(Exception):
 class UnsupportedOSException(Exception):
     """Exception raised for unsupported operating system types."""
 
-    def __init__(self, output: str):
-        super().__init__(f"Client OS not supported, output: {output}")
+    def __init__(self, output: str = ""):
+        super().__init__(f"Host OS not supported, output: {output}")
 
 
 class SSHRedirectionError(Exception):
