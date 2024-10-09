@@ -77,9 +77,12 @@ class ConnectAlarm:
 
         self.topic_alarm_conn_status = "hprombex/alarm/connection_status"
         self.topic_alarm_status = "hprombex/alarm/status"
+        self.topic_alarm_sending_sms_status = "hprombex/alarm/sending_sms_status"
 
         self.android_phone_ip_vpn = HENIEK_PHONE_VPN.get("ip")
         self.android_phone_ip_local = HENIEK_PHONE.get("ip")
+        self.android_phone_ips = [self.android_phone_ip_vpn, self.android_phone_ip_local]
+
         self.adb_port = 5555
 
         self.alarm_central_number = ALARM_CENTRAL_NUMBER
@@ -176,41 +179,84 @@ class ConnectAlarm:
         """
         if self.get_connection_status() == "online":
             self.log.info(
-                "Device is already online, no need to send wake-up SMS."
+                "Alarm central is already online, no need to send wakeup SMS."
             )
             return
 
         sms_msg_from_api = str(self.alarm.get_wakeup_sms().message)
         sms_msg = sms_msg_from_api if sms_msg_from_api else self.alarm_sms_msg
 
-        for ip in [self.android_phone_ip_vpn, self.android_phone_ip_local]:
-            if self.is_host_connected(ip):
-                self.adb = AdbConnection(
-                    adb_ip=ip, adb_port=self.adb_port, logger=self.log
-                )
-                #  connect to remote device
-                self.adb.connect()
-                sleep(2)
-                self.adb.wait_for_device()
-                if not self.adb.is_connected():
-                    continue
+        for ip in self.android_phone_ips:
+            if not self.is_host_connected(ip):
+                continue  # Host is not connected, skip to the next host
 
-                # todo if send smsm is wip = wait
+            self.adb = AdbConnection(
+                adb_ip=ip, adb_port=self.adb_port, logger=self.log
+            )
+            self.adb.connect()  # connect to ADB device
+            sleep(2)
+            self.adb.wait_for_device()
+            if not self.adb.is_connected():
+                continue  # Skip iteration if the ADB connection is not established
 
-                self.log.info(
-                    f"Sending SMS to {self.alarm_central_number} via ADB"
-                )
-                for _ in range(5):  # try to send SMS X times
-                    # execute send SMS command with special message
-                    # todo mqtt send sms wip
-                    self.adb.send_sms(self.alarm_central_number, sms_msg)
+            if self._check_sending_sms_status():
+                # SMS status successfully set to 'standby' and connection is 'online'
+                return
 
-                    sleep(30)
-                    for _ in range(6):
-                        if self.get_connection_status() == "online":
-                            # todo mqtt send sms DONE
-                            return
-                        sleep(20)
+            self.log.info(
+                f"Sending SMS to {self.alarm_central_number} via ADB"
+            )
+            for _ in range(5):  # try to send SMS X times
+                self._publish_alarm_sms_status("running")
+
+                # execute send SMS command with special message
+                self.adb.send_sms(self.alarm_central_number, sms_msg)
+
+                sleep(30)
+                for _ in range(6):
+                    if self.get_connection_status() == "online":
+                        self._publish_alarm_sms_status("standby")
+                        return
+
+                    sleep(20)
+                self._publish_alarm_sms_status("standby")
+
+    def _check_sending_sms_status(self) -> bool:
+        """
+        Check the status of sending SMS through the MQTT topic.
+
+        The method subscribes to the MQTT topic related to SMS status and
+        checks for 'standby' status. It will make 24 attempts at 5-second
+        intervals (2 minutes total). If 'standby' is detected, it will break
+        the loop early.
+
+        :return: True if the SMS status was set to 'standby' or already in 'standby',
+                 False otherwise.
+        """
+        sending_sms_status = ""
+        for _ in range(24):
+            sending_sms_status = self.mqtt.subscribe_single(
+                self.topic_alarm_sending_sms_status
+            )
+            if sending_sms_status == "standby":
+                break  # SMS status is 'standby', breaking the loop early
+            sleep(5)  # 5 * 24 = 120 sec (2 min wait for status change)
+
+        if self.get_connection_status() == "online":
+            if sending_sms_status != "standby":
+                # If the status is not 'standby', update it
+                self._publish_alarm_sms_status("standby")
+            return True
+
+        return False
+
+    def _publish_alarm_sms_status(self, status: str) -> None:
+        """
+        Publishes the alarm SMS status to the MQTT topic.
+
+        :param status: The status to publish.
+        """
+        self.mqtt.publish(self.topic_alarm_sending_sms_status, status)
 
     def dmesg_msg(self, msg: str) -> None:
         """
@@ -354,42 +400,42 @@ class ConnectAlarm:
         parser = argparse.ArgumentParser()
         parser.add_argument(
             "--get_connection_status",
-            help="todo",
+            help="Retrieve the current connection status of the alarm system.",
             required=False,
             action="store_true",
             default=False,
         )
         parser.add_argument(
             "--get_alarm_status",
-            help="todo",
+            help="Retrieve the current status of the alarm system.",
             required=False,
             action="store_true",
             default=False,
         )
         parser.add_argument(
             "--wait_for_alarm_status",
-            help="off(disarm) or on(arm)",
+            help="Specify the status to wait for: 'off' (disarm) or 'on' (arm).",
             type=str,
             required=False,
             default=None,
         )
         parser.add_argument(
             "--enable_alarm",
-            help="todo",
+            help="Enable the alarm system.",
             required=False,
             action="store_true",
             default=False,
         )
         parser.add_argument(
             "--disable_alarm",
-            help="todo",
+            help="Disable the alarm system.",
             required=False,
             action="store_true",
             default=False,
         )
         parser.add_argument(
             "--enable_nightmode",
-            help="todo",
+            help="Enable the alarm system in night mode.",
             required=False,
             action="store_true",
             default=False,
