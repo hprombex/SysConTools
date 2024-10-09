@@ -164,7 +164,7 @@ class MQTTClient:
     @check_connection
     def subscribe_single(
         self, topic: str, wait_time: int = 5
-    ) -> bytes | bytearray:
+    ) -> str:
         """
         Subscribes to a specified MQTT topic, receives a single message, and returns it.
 
@@ -184,7 +184,7 @@ class MQTTClient:
 
         # Wait for the message to be received and return it
         while not self._received_message:
-            # wait only X sec (1sec by default)
+            # wait only X sec (5sec by default)
             for _ in range(wait_time * 10):
                 if self._received_message:
                     break
@@ -192,15 +192,15 @@ class MQTTClient:
                 sleep(0.1)
             else:
                 self.client.loop_stop()  # Stop the loop
-                # Return an empty bytes object if no message is received within the wait time
-                return b""
+                # Return an empty string object if no message is received within the wait time
+                return ""
 
         self.client.loop_stop()  # Stop the loop after receiving the message
 
         msg = self._received_message
         self._received_message = None
 
-        return msg
+        return msg.decode("utf-8", "ignore")
 
     def disconnect(self) -> None:
         """
