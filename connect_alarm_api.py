@@ -25,13 +25,14 @@ from datetime import datetime
 from const_sec import (
     ALARM_CENTRAL_NUMBER,
     ALARM_SMS_MSG,
-    HENIEK_PHONE_VPN,
-    HENIEK_PHONE,
     MQTT_BROKER,
     MQTT_PORT,
+    HENIEK_PHONE,
+    HENIEK_PHONE_VPN,
+    HENIEK_PHONE_VPN2,
 )
 from lsSecurity import Security
-from visonic import alarm as visonic_alarm
+from visonic.alarm import Setup as VisonicSetup
 from visonic.exceptions import PanelNotConnectedError
 
 import warnings
@@ -65,37 +66,38 @@ class ConnectAlarm:
         else:
             self.log = Log(store=False)
 
-        self.adb = None
-        self._alarm = None
-        self._mqtt = None
-        self._local_conn = None
+        self._adb_port = 5555
 
-        self.mqtt_broker = MQTT_BROKER.get("ip")
-        self.mqtt_port = MQTT_PORT
-        self.mqtt_username = self._prepare_password("mqtt_user")
-        self.mqtt_password = self._prepare_password("mqtt_pass")
+        self._adb: "AdbConnection | None" = None
+        self._alarm: "VisonicSetup | None" = None
+        self._mqtt: "MQTTClient | None" = None
+        self._local_conn: "LocalConnection | None" = None
 
-        self.topic_alarm_conn_status = "hprombex/alarm/connection_status"
-        self.topic_alarm_status = "hprombex/alarm/status"
-        self.topic_alarm_sending_sms_status = "hprombex/alarm/sending_sms_status"
+        self.mqtt_broker: str = MQTT_BROKER.get("ip")
+        self.mqtt_port: int = MQTT_PORT
+        self.mqtt_username: str = self._prepare_password("mqtt_user")
+        self.mqtt_password: str = self._prepare_password("mqtt_pass")
 
-        self.android_phone_ip_vpn = HENIEK_PHONE_VPN.get("ip")
-        self.android_phone_ip_local = HENIEK_PHONE.get("ip")
-        self.android_phone_ips = [self.android_phone_ip_vpn, self.android_phone_ip_local]
+        self.topic_alarm_conn_status: str = "hprombex/alarm/connection_status"
+        self.topic_alarm_status: str = "hprombex/alarm/status"
+        self.topic_alarm_sending_sms_status: str = (
+            "hprombex/alarm/sending_sms_status"
+        )
 
-        self.adb_port = 5555
-
-        self.alarm_central_number = ALARM_CENTRAL_NUMBER
-        self.alarm_sms_msg = ALARM_SMS_MSG
+        self.android_phone_ips = [
+            HENIEK_PHONE_VPN2.get("ip"),
+            HENIEK_PHONE_VPN.get("ip"),
+            HENIEK_PHONE.get("ip"),
+        ]
 
     @property
-    def alarm(self) -> visonic_alarm.Setup:
+    def alarm(self) -> VisonicSetup:
         """
         Initializes and returns an instance of the Visonic alarm system setup.
 
         :return: An instance of 'visonic_alarm.Setup' representing the configured alarm system.
         """
-        if not self._alarm:
+        if self._alarm is None:
             alarm_hostname = self._prepare_password("Alarm_hostname")
             alarm_user_email = self._prepare_password("Alarm_user_email")
             alarm_user_pass = self._prepare_password("Alarm_user_pass")
@@ -103,7 +105,7 @@ class ConnectAlarm:
             alarm_serial_number = self._prepare_password("Alarm_serial_number")
             alarm_app_uuid = self._prepare_password("Alarm_app_uuid")
 
-            self._alarm = visonic_alarm.Setup(alarm_hostname, alarm_app_uuid)
+            self._alarm = VisonicSetup(alarm_hostname, alarm_app_uuid)
             self._alarm.authenticate(alarm_user_email, alarm_user_pass)
             self._alarm.panel_login(alarm_serial_number, alarm_user_code)
 
@@ -129,7 +131,7 @@ class ConnectAlarm:
 
         :return: LocalConnection instance.
         """
-        if not self._local_conn:
+        if self._local_conn is None:
             self._local_conn = LocalConnection(logger=self.log)
 
         return self._local_conn
@@ -141,7 +143,7 @@ class ConnectAlarm:
 
         :return: MQTTClient instance.
         """
-        if not self._mqtt:
+        if self._mqtt is None:
             self._mqtt = MQTTClient(
                 broker=self.mqtt_broker,
                 port=self.mqtt_port,
@@ -184,19 +186,19 @@ class ConnectAlarm:
             return
 
         sms_msg_from_api = str(self.alarm.get_wakeup_sms().message)
-        sms_msg = sms_msg_from_api if sms_msg_from_api else self.alarm_sms_msg
+        sms_msg = sms_msg_from_api if sms_msg_from_api else ALARM_SMS_MSG
 
         for ip in self.android_phone_ips:
             if not self.is_host_connected(ip):
                 continue  # Host is not connected, skip to the next host
 
-            self.adb = AdbConnection(
-                adb_ip=ip, adb_port=self.adb_port, logger=self.log
+            self._adb = AdbConnection(
+                adb_ip=ip, adb_port=self._adb_port, logger=self.log
             )
-            self.adb.connect()  # connect to ADB device
+            self._adb.connect()  # connect to ADB device
             sleep(2)
-            self.adb.wait_for_device()
-            if not self.adb.is_connected():
+            self._adb.wait_for_device()
+            if not self._adb.is_connected():
                 continue  # Skip iteration if the ADB connection is not established
 
             if self._check_sending_sms_status():
@@ -204,13 +206,13 @@ class ConnectAlarm:
                 return
 
             self.log.info(
-                f"Sending SMS to {self.alarm_central_number} via ADB"
+                f"Sending SMS to {ALARM_CENTRAL_NUMBER} via ADB"
             )
             for _ in range(5):  # try to send SMS X times
                 self._publish_alarm_sms_status("running")
 
                 # execute send SMS command with special message
-                self.adb.send_sms(self.alarm_central_number, sms_msg)
+                self._adb.send_sms(ALARM_CENTRAL_NUMBER, sms_msg)
 
                 sleep(30)
                 for _ in range(6):
