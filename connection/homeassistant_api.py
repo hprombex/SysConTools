@@ -266,3 +266,16 @@ class HomeAssistantAPI:
             url = f"{url}/"
 
         return url
+
+    def get_entity_value(self, entity: str, key: str = "state") -> str:
+        """
+        Retrieve a specific value for a Home Assistant entity from the API response.
+
+        :param entity: The entity id (e.g. switch.your_switch_name, light.living_room)
+        :param key: The key within the entity's value to retrieve (defaults to "state").
+        :return: The value associated with the provided key, or an empty string if the key is not found.
+        """
+        api_response = self.get(entity=entity)
+        entity_value = api_response.get(key, "")
+
+        return entity_value
