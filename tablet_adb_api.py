@@ -16,15 +16,15 @@ It offers various functionalities such as controlling apps, managing the screen,
 and system operations via ADB.
 """
 
+import argparse
+from time import sleep, time
+from datetime import datetime
+
 import warnings
 from cryptography.utils import CryptographyDeprecationWarning
 
 # Suppress CryptographyDeprecationWarning
 warnings.filterwarnings("ignore", category=CryptographyDeprecationWarning)
-
-import argparse
-from time import sleep, time
-from datetime import datetime
 
 from connection.adb import AdbConnection
 from lsLog import Log
@@ -37,17 +37,18 @@ class TabletAdbApi:
         """
         Initialize the TabletAdbApi class.
 
-        :param logger: An instance of the Log class for logging. If not provided, a default logger is used.
+        :param logger: An instance of the Log class for logging.
+                       If not provided, a default logger is used.
         """
         if logger:
             self.log = logger
         else:
             self.log = Log(store=False)
 
-        self._adb = None
-        self.adb_port = 5555
-        self.adb_ip = None
-        self.wallpanel_app_name = "xyz.wallpanel.app"
+        self._adb: "AdbConnection | None" = None
+        self.adb_port: int = 5555
+        self.adb_ip: "str | None" = None
+        self.wallpanel_app_name: str = "xyz.wallpanel.app"
 
     @property
     def adb(self) -> AdbConnection:
