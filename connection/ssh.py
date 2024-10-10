@@ -175,11 +175,11 @@ class SSHConnection:
         Attempt to re-establish the SSH connection.
         :raises SSHConnectionFailedException: If the SSH connection cannot be re-established.
         """
-        self.log.warning("Connection lost, attempting to reconnect...")
+        self.log.warning(f"Connection lost to {self._ip}, attempting to reconnect...")
         self._connect()
         if not self._ssh_client.get_transport().is_active():
             raise SSHConnectionFailedException(self._ip)
-        self.log.success("Successfully reconnected.")
+        self.log.success(f"Successfully reconnected to {self._ip}.")
 
     @property
     def remote_connection(self) -> SSHClient:
