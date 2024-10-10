@@ -105,7 +105,7 @@ class LocalConnection:
         :return: An instance of AutoImportModule,
                  either previously initialized or newly created.
         """
-        if not self._module:
+        if self._module is None:
             self._module = AutoImportModule()
         return self._module
 
