@@ -91,6 +91,23 @@ class AdbConnection:
                 logger=self.log,
             )
 
+    def __str__(self) -> str:
+        """Returns a user-friendly string representation of the MQTTClient instance."""
+        return (
+            f"ADB connection to device '{self._adb_ip}:{self._adb_port}' "
+            f"connected={'Yes' if self.connected else 'No'})"
+        )
+
+    def __repr__(self) -> str:
+        """
+        Returns a detailed string representation of the MQTTClient instance,
+        suitable for debugging.
+        """
+        return (
+            f"AdbConnection(adb_ip={self._adb_ip!r}, adb_port={self._adb_port!r}, "
+            f"connected={self.connected!r})"
+        )
+
     @property
     def adb_executable(self) -> str:
         """
@@ -216,7 +233,6 @@ class AdbConnection:
                 continue
 
             if self.wait_for_device(timeout=10) or self.is_connected():
-                print("connected!!!!")
                 self.connected = True
                 return
 
