@@ -382,7 +382,7 @@ class AdbConnection:
             as_root=False,
         ).return_code
 
-    def send_sms(self, phone_number: str | int, message: str) -> None:
+    def send_sms(self, phone_number: "str | int", message: str) -> None:
         """
         Send an SMS message to the specified phone number.
 
@@ -393,12 +393,20 @@ class AdbConnection:
         :param phone_number: The recipient's phone number.
         :param message: The SMS message content to be sent.
         """
+        self.log.info(f"Sending SMS to {phone_number}...")
+
         sms_cmd = (  # Tested on Android 10 and Android 12
             'service call isms 5 i32 0 s16 "com.android.mms.service" '
-            f's16 "null" s16 \'{phone_number}\' s16 "null" s16 "{message}" '
+            f's16 "null" s16 \'{phone_number}\' s16 "null" s16 \'{message}\' '
             's16 "null" s16 "null" s16 "null" s16 "null"'
         )
-        self.run_shell_cmd(sms_cmd, as_root=False)
+        result = self.run_shell_cmd(sms_cmd, as_root=False)
+        if result.return_code:
+            self.log.warning(
+                f"Failed to send SMS to {phone_number}: {result.stderr}"
+            )
+        else:
+            self.log.info(f"SMS successfully sent to {phone_number}")
 
     def home_screen(self) -> None:
         """
