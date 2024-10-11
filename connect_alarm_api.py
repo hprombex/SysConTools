@@ -28,8 +28,8 @@ from const_sec import (
     MQTT_BROKER,
     MQTT_PORT,
     HENIEK_PHONE,
-    HENIEK_PHONE_VPN,
-    HENIEK_PHONE_VPN2,
+    HENIEK_PHONE_VPN_TS,
+    HENIEK_PHONE_VPN_ZT,
 )
 from lsSecurity import Security
 from visonic.alarm import Setup as VisonicSetup
@@ -85,10 +85,13 @@ class ConnectAlarm:
         )
 
         self.android_phone_ips = [
-            HENIEK_PHONE_VPN2.get("ip"),
-            HENIEK_PHONE_VPN.get("ip"),
             HENIEK_PHONE.get("ip"),
+            HENIEK_PHONE_VPN_TS.get("ip"),
+            HENIEK_PHONE_VPN_ZT.get("ip"),
         ]
+
+        self._connection_status: "str | None" = None
+        self._alarm_status: "str | None" = None
 
     @property
     def alarm(self) -> VisonicSetup:
@@ -154,6 +157,36 @@ class ConnectAlarm:
 
         return self._mqtt
 
+    @property
+    def connection_status(self) -> str:
+        """
+        Retrieves the current connection status of the alarm system.
+
+        :return: A string indicating the connection status, either "online" or "offline".
+        """
+        self.log.info("Get connection status.")
+        connection_status = "online" if self.alarm.connected() else "offline"
+        if connection_status != self._connection_status:
+            self._connection_status = connection_status
+            self.mqtt.publish(self.topic_alarm_conn_status, connection_status)
+
+        return self._connection_status
+
+    @property
+    def alarm_status(self) -> str:
+        """
+        Retrieves the current alarm status.
+
+        :return: A string indicating the current alarm status ("on", "off").
+        """
+        self.log.info("Get alarm status.")
+        alarm_status = self.get_last_status()
+        if alarm_status != self._alarm_status:
+            self._alarm_status = alarm_status
+            self.mqtt.publish(self.topic_alarm_status, alarm_status)
+
+        return self._alarm_status
+
     def is_host_connected(self, host_ip: str) -> bool:
         """
         Checks if the specified host is reachable by sending a ping request.
@@ -179,7 +212,7 @@ class ConnectAlarm:
         to online during the sending process, the method will stop sending additional SMS
         messages.
         """
-        if self.get_connection_status() == "online":
+        if self.connection_status == "online":
             self.log.info(
                 "Alarm central is already online, no need to send wakeup SMS."
             )
@@ -205,22 +238,20 @@ class ConnectAlarm:
                 # SMS status successfully set to 'standby' and connection is 'online'
                 return
 
-            self.log.info(
-                f"Sending SMS to {ALARM_CENTRAL_NUMBER} via ADB"
-            )
+            self.log.info(f"Sending SMS to {ALARM_CENTRAL_NUMBER} via ADB")
             for _ in range(5):  # try to send SMS X times
                 self._publish_alarm_sms_status("running")
 
                 # execute send SMS command with special message
                 self._adb.send_sms(ALARM_CENTRAL_NUMBER, sms_msg)
 
-                sleep(30)
-                for _ in range(6):
-                    if self.get_connection_status() == "online":
+                sleep(20)
+                for _ in range(10):
+                    if self.connection_status == "online":
                         self._publish_alarm_sms_status("standby")
                         return
 
-                    sleep(20)
+                    sleep(10)
                 self._publish_alarm_sms_status("standby")
 
     def _check_sending_sms_status(self) -> bool:
@@ -244,7 +275,7 @@ class ConnectAlarm:
                 break  # SMS status is 'standby', breaking the loop early
             sleep(5)  # 5 * 24 = 120 sec (2 min wait for status change)
 
-        if self.get_connection_status() == "online":
+        if self.connection_status == "online":
             if sending_sms_status != "standby":
                 # If the status is not 'standby', update it
                 self._publish_alarm_sms_status("standby")
@@ -281,40 +312,28 @@ class ConnectAlarm:
         dump_cmd = f"echo '{text}' > {destination_file}"
         self.local_connection.run_cmd(dump_cmd)
 
-    def get_connection_status(self) -> str:
+    def wait_for_alarm_status(self, status: str = "disarm") -> str:
         """
-        Retrieves the current connection status of the alarm system.
+        Waits for the alarm system to reach the specified status within a fixed
+        number of attempts.
 
-        :return: A string indicating the connection status, either "online" or "offline".
+        :param status: The desired alarm status to wait for.
+            "arm", "disarm", "on" or "off"
+        :return: The current alarm status.
         """
-        self.log.info("Get connection status.")
-        connection_status = "online" if self.alarm.connected() else "offline"
-        self.mqtt.publish(self.topic_alarm_conn_status, connection_status)
+        max_attempts = 10  # number of attempts to check the status
+        self.log.info(f"Waiting for alarm status to change to '{status}'")
+        for _ in range(max_attempts):
+            current_status = self.alarm_status
+            exp_status = self._parse_alarm_status(status)
+            if exp_status == current_status:
+                break
+            self.log.info(
+                f"Current alarm status is '{current_status}', waiting for '{exp_status}'"
+            )
+            sleep(5)  # wait fot status change
 
-        return connection_status
-
-    def get_alarm_status(self, wait_for_status: str = None) -> str:
-        """
-        Retrieves the current alarm status, optionally waiting for a specific status change.
-
-        :param wait_for_status: An optional string representing the status to wait for.
-        :return: A string indicating the current alarm status ("on", "off", or "unknown").
-        """
-        alarm_status = "unknown"
-
-        self.log.info("Get alarm status.")
-        if wait_for_status:
-            for _ in range(10):
-                alarm_status = self._parse_alarm_status(self.get_last_status())
-                if alarm_status == self._parse_alarm_status(wait_for_status):
-                    break
-                sleep(5)  # wait fot status change
-        else:
-            alarm_status = self._parse_alarm_status(self.get_last_status())
-
-        self.mqtt.publish(self.topic_alarm_status, alarm_status)
-
-        return alarm_status
+        return self.alarm_status
 
     def get_last_status(self) -> str:
         """
@@ -330,6 +349,7 @@ class ConnectAlarm:
             for event in self.alarm.get_events()
             if event.label in ["DISARM", "ARM"]
         ]
+
         return self._parse_alarm_status(str(clear_events[-1].label).lower())
 
     @staticmethod
@@ -350,7 +370,7 @@ class ConnectAlarm:
     def run_disable_alarm(self) -> None:
         """Disables the alarm system."""
         self.log.info("Disable alarm.")
-        for _ in range(3):
+        for _ in range(5):
             try:
                 self.alarm.disarm()
             except PanelNotConnectedError as e:
@@ -359,13 +379,13 @@ class ConnectAlarm:
                 self.dmesg_msg(msg)
                 self.send_wakeup_sms()
                 continue
-            if self.get_alarm_status(wait_for_status="disarm") == "off":
+            if self.wait_for_alarm_status(status="disarm") == "off":
                 break
 
     def run_enable_alarm(self):
         """Enables the alarm system."""
         self.log.info("Enable alarm.")
-        for _ in range(2):
+        for _ in range(5):
             try:
                 self.alarm.arm_away()
             except PanelNotConnectedError as e:
@@ -374,13 +394,13 @@ class ConnectAlarm:
                 self.dmesg_msg(msg)
                 self.send_wakeup_sms()
                 continue
-            if self.get_alarm_status(wait_for_status="arm") == "on":
+            if self.wait_for_alarm_status(status="arm") == "on":
                 break
 
     def run_enable_nightmode_alarm(self):
         """Enables the alarm system in night mode."""
         self.log.info("Enable nightmode alarm.")
-        for _ in range(2):
+        for _ in range(5):
             try:
                 self.alarm.arm_night()
             except PanelNotConnectedError as e:
@@ -389,7 +409,7 @@ class ConnectAlarm:
                 self.dmesg_msg(msg)
                 self.send_wakeup_sms()
                 continue
-            if self.get_alarm_status(wait_for_status="arm") == "on":
+            if self.wait_for_alarm_status(status="arm") == "on":
                 break
 
     @staticmethod
@@ -479,10 +499,15 @@ class ConnectAlarm:
             self.run_disable_alarm()
 
         if args.get_connection_status:
-            connection_status = self.get_connection_status()
-            print(connection_status)
-        if args.get_alarm_status or args.wait_for_alarm_status:
-            alarm_status = self.get_alarm_status(args.wait_for_alarm_status)
+            print(self.connection_status)
+
+        if args.get_alarm_status:
+            print(self.alarm_status)
+
+        if args.wait_for_alarm_status:
+            alarm_status = self.wait_for_alarm_status(
+                args.wait_for_alarm_status
+            )
             print(alarm_status)
 
 

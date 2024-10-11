@@ -91,7 +91,7 @@ class MQTTClient:
         self.client.on_message = self.mqtt_on_message
         self.connected: bool = False
 
-        self._received_message: bytes | bytearray | None = None
+        self._received_message: "str | None" = None
 
     def __str__(self) -> str:
         """Returns a user-friendly string representation of the MQTTClient instance."""
@@ -200,7 +200,7 @@ class MQTTClient:
         msg = self._received_message
         self._received_message = None
 
-        return msg.decode("utf-8", "ignore")
+        return msg
 
     def disconnect(self) -> None:
         """
@@ -249,9 +249,6 @@ class MQTTClient:
             return ReceiveMessage(
                 bare_topic, "", msg.qos, msg.retain, msg.timestamp
             )
-        self.log.info(
-            f"Received{' retained' if msg.retain else ''} message on {topic} (qos={msg.qos}): {msg.payload[0:8192]}"
-        )
         subscription = Subscription(topic, msg.qos)
 
         payload = msg.payload
@@ -262,6 +259,10 @@ class MQTTClient:
             self.log.fail(
                 f"Can't decode payload {msg.payload[0:8192]} on {topic} with encoding {subscription.encoding}"
             )
+
+        self.log.info(
+            f"Received{' retained' if msg.retain else ''} message on {topic} (qos={msg.qos}): {payload[0:8192]}"
+        )
 
         receive_msg = ReceiveMessage(
             subscription.topic,
