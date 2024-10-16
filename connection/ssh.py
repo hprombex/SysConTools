@@ -175,7 +175,9 @@ class SSHConnection:
         Attempt to re-establish the SSH connection.
         :raises SSHConnectionFailedException: If the SSH connection cannot be re-established.
         """
-        self.log.warning(f"Connection lost to {self._ip}, attempting to reconnect...")
+        self.log.warning(
+            f"Connection lost to {self._ip}, attempting to reconnect..."
+        )
         self._connect()
         if not self._ssh_client.get_transport().is_active():
             raise SSHConnectionFailedException(self._ip)
@@ -226,6 +228,38 @@ class SSHConnection:
             OsType.LINUX: "shutdown -h now",
         }
         self.run_cmd(shutdown_cmd[self._host_os_type], sudo=True)
+        self.disconnect()
+        sleep(5)  # extra sleep for waiting to disconnect a connection
+
+    def sleep_host(self) -> None:
+        """Sleep (S3) Host."""
+        sleep_cmds = {
+            OsType.WINDOWS: [
+                "powercfg /hibernate off & rundll32.exe powrprof.dll,SetSuspendState Sleep"
+            ],
+            OsType.LINUX: [
+                "sudo echo deep > /sys/power/mem_sleep",
+                "sudo echo mem > /sys/power/state",
+            ],
+        }
+        self.log.info(f"Sleep host {self._ip}")
+        for cmd in sleep_cmds[self._host_os_type]:
+            self.run_cmd(cmd)
+        sleep(5)
+
+        self.disconnect()
+        sleep(5)  # extra sleep for waiting to disconnect a connection
+
+    def hibernate_host(self) -> None:
+        """Hibernate (S4) Host."""
+        hibernate_cmd = {
+            OsType.WINDOWS: "powercfg /hibernate on & rundll32.exe powrprof.dll,SetSuspendState 0,1,0",
+            OsType.LINUX: "echo disk > /sys/power/state",
+        }
+        self.log.info(f"Hibernate host {self._ip}")
+        self.run_cmd(hibernate_cmd[self._host_os_type])
+        sleep(5)
+
         self.disconnect()
         sleep(5)  # extra sleep for waiting to disconnect a connection
 
@@ -323,7 +357,13 @@ class SSHConnection:
             self._enable_sudo = True
 
         verify_cmd(cmd)
-        cmd = adjust_cmd(cmd, docker_container, self._enable_sudo)
+        cmd = adjust_cmd(
+            cmd,
+            docker_container,
+            False
+            if self._host_os_type == OsType.WINDOWS
+            else self._enable_sudo,
+        )
 
         proc = self.run_process(
             cmd=cmd,
@@ -417,7 +457,12 @@ class SSHConnection:
 
         verify_cmd(cmd)
 
-        cmd = adjust_cmd(cmd, sudo=self._enable_sudo)
+        cmd = adjust_cmd(
+            cmd,
+            sudo=False
+            if self._host_os_type == OsType.WINDOWS
+            else self._enable_sudo,
+        )
         session = self.remote_connection.get_transport().open_session(
             timeout=timeout
         )

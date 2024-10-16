@@ -326,5 +326,17 @@ class LocalConnection:
     def shutdown_host(self) -> None:
         """Shutdown the local host."""
         raise NotImplementedError(
-            "Shutdown is not implemented."
+            "Shutdown host is not implemented."
+        )  # todo add similar to this from SSH?
+
+    def sleep_host(self) -> None:
+        """Sleep (S3) Host."""
+        raise NotImplementedError(
+            "Sleep host is not implemented."
+        )  # todo add similar to this from SSH?
+
+    def hibernate_host(self) -> None:
+        """Hibernate (S4) Host."""
+        raise NotImplementedError(
+            "Sleep host is not implemented."
         )  # todo add similar to this from SSH?
