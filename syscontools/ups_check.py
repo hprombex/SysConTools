@@ -176,33 +176,37 @@ class UPSCheck:
         :param sleep_time: The amount of time (in seconds) to wait
                            before performing the host checks.
         """
+        total_hosts: int = len(HOSTS_CHECK)
+        online_count: int = 0
+        offline_count: int = 0
+        fail_msg_to_print: str = ""
+        pass_msg_to_print: str = ""
+
         sleep(sleep_time)
         self.log.info(f"WW: {get_ww()}")
-        to_print_fail, to_print_pass = "", ""
+
         for host in HOSTS_CHECK:
             out = self.ping.run(host.get("ip"), count=1)
             if out.pass_count == 1:
-                to_print_pass += "\n{:<30} {}".format(
+                pass_msg_to_print += "\n{:<30} {}".format(
                     host.get("name"), "ONLINE"
                 )
+                online_count += 1
             else:
-                to_print_fail += "\n{:<30} {}".format(
+                fail_msg_to_print += "\n{:<30} {}".format(
                     host.get("name"), "OFFLINE"
                 )
+                offline_count += 1
 
         # Log the summary of results after checking all hosts
-        total_hosts: int = len(HOSTS_CHECK)
-        online_count: int = len(to_print_pass.splitlines())
-        offline_count: int = len(to_print_fail.splitlines())
-
         self.log.info(
             f"Checked {total_hosts} hosts: {online_count} ONLINE, "
             f"{offline_count} OFFLINE"
         )
 
         self.log.timestamp = False
-        self.log.success(to_print_pass.lstrip("\n"))
-        self.log.fail(to_print_fail.lstrip("\n"))
+        self.log.success(pass_msg_to_print.lstrip("\n"))
+        self.log.fail(fail_msg_to_print.lstrip("\n"))
         self.log.timestamp = True
 
     def run(self, sleep_time: int = 30) -> None:
@@ -261,9 +265,6 @@ class UPSCheck:
             # Check if electricity is available
             if self.is_electricity():
                 # Disable emergency power-off mode when electricity is restored
-                self.log.info(
-                    "Electricity detected. Disabling emergency power-off."
-                )
                 self._emergency_poweroff = False
             else:
                 self.log.info("Electricity not detected. Entering wait mode.")
@@ -364,7 +365,9 @@ class UPSCheck:
         max_pings = 5
         max_attempts = 5
         for attempt in range(max_attempts):
-            self.log.info(f"Shutdown NAS (Attempt: {attempt + 1})")
+            self.log.info(
+                f"Shutdown NAS (Attempt: {attempt + 1}/{max_attempts})"
+            )
             self.nas_connection.shutdown_host()
             if self.nas_is_offline(ping_count=max_pings):
                 break
@@ -383,7 +386,7 @@ class UPSCheck:
         for attempt in range(max_attempts):
             self.log.info(f"Wake up NAS (Attempt: {attempt + 1})")
             wake_on_lan(NAS_MAC)
-            sleep(30)  # Usually, NAS wakes up after 70sec
+            sleep(45)  # Usually, NAS wakes up after 70sec
             self.log.info("Waiting for NAS to wake up.")
             if self.nas_is_online(ping_count=max_pings, all_fail=False):
                 break
@@ -427,12 +430,12 @@ class UPSCheck:
             out = self.ping.run(destination_ip, count=ping_count)
             if out.pass_count >= expected_ping_count:  # reason to turn ON NAS
                 self.log.success(
-                    f"Ping result dst ip {destination_ip} ({host_name}) passed."
+                    f"Ping result destination IP {destination_ip} ({host_name}) passed."
                 )
                 return {"reason_type": "ping", "reason_val": destination_ip}
             else:
                 self.log.fail(
-                    f"Ping result dst ip {destination_ip} ({host_name}) failed."
+                    f"Ping result destination IP {destination_ip} ({host_name}) failed."
                 )
 
         # Second reasons
@@ -509,17 +512,16 @@ class UPSCheck:
                 # Allow extra time for the NAS to stabilize after waking up
                 sleep(sleep_time)
 
-                while not self.is_reason_valid(reason_data):
+                while self.is_reason_valid(reason_data):
                     # Continuously check if the wake-up reason is still valid.
                     # If the reason is no longer valid, exit this loop to re-evaluate
                     # whether the NAS should remain powered on or turned off.
-                    sleep(5)
+                    sleep(60)
 
             else:
                 if self.nas_is_online():
-                    self.setup_camera_ftp_upload(
-                        False
-                    )  # Disable camera FTP upload after NAS shutdown
+                    # Disable camera FTP upload before NAS shutdown
+                    self.setup_camera_ftp_upload(False)
                     self.nas_shutdown()
 
             sleep(5)  # sleep between checks
