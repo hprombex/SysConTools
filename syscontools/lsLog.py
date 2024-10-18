@@ -65,23 +65,10 @@ class Log(metaclass=LogMetaclass):
         self._store = store
         self._app_name = app_name
         self._timestamp = timestamp
+        self._log_level = log_level
 
         # Set up the logger
-        self.logger = logging.getLogger(app_name)
-        self.logger.setLevel(log_level)  # Set default logging level
-
-        # Console handler
-        console_handler = logging.StreamHandler()
-        console_handler.setFormatter(self._get_formatter())
-        self.logger.addHandler(console_handler)
-
-        # File handler if storing logs
-        if self._store:
-            self._create_dir(self.log_dir)
-            log_filename = self._get_log_filename()
-            file_handler = logging.FileHandler(log_filename)
-            file_handler.setFormatter(self._get_formatter())
-            self.logger.addHandler(file_handler)
+        self._init_logger()
 
     @property
     def timestamp(self) -> bool:
@@ -102,8 +89,41 @@ class Log(metaclass=LogMetaclass):
         """
         if isinstance(value, bool):
             self._timestamp = value
+            self._init_logger()
         else:
             raise ValueError("The value should be a boolean.")
+
+    def _init_logger(self) -> None:
+        """
+        Initializes the logger for the application. Configures the logger to handle
+        both console output and file output if logging to a file is enabled.
+
+        - Removes any existing handlers to avoid duplicate logs.
+        - Adds a console handler to display logs in the console.
+        - Adds a file handler if 'self._store' is True, which saves logs to a file.
+        """
+        # Set up the logger with the given app name and logging level
+        self.logger = logging.getLogger(self._app_name)
+        self.logger.setLevel(self._log_level)  # Set default logging level
+
+        # Remove existing handlers to prevent duplicate logs
+        handlers = self.logger.handlers[:]
+        for handler in handlers:
+            self.logger.removeHandler(handler)
+            handler.close()
+
+        # Console handler: logs to console
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(self._get_formatter())
+        self.logger.addHandler(console_handler)
+
+        # File handler: logs to a file if storing logs is enabled
+        if self._store:
+            self._create_dir(self.log_dir)  # Ensure the log directory exists
+            log_filename = self._get_log_filename()
+            file_handler = logging.FileHandler(log_filename)
+            file_handler.setFormatter(self._get_formatter())
+            self.logger.addHandler(file_handler)
 
     def _get_formatter(self) -> logging.Formatter:
         """
@@ -116,7 +136,7 @@ class Log(metaclass=LogMetaclass):
                 "%(asctime)s [%(levelname)-5.5s]: %(message)s"
             )
         else:
-            return logging.Formatter("[%(levelname)-5.5s]: %(message)s")
+            return logging.Formatter("%(message)s")
 
     def _get_log_filename(self) -> str:
         """
@@ -194,7 +214,9 @@ class Log(metaclass=LogMetaclass):
         :param exc_info: For a full stack trace.
         :param text: The message to log.
         """
-        self.log(logging.DEBUG, text, txt_color="light_blue", exc_info=exc_info)
+        self.log(
+            logging.DEBUG, text, txt_color="light_blue", exc_info=exc_info
+        )
 
     def out(self, text: str) -> None:
         """
