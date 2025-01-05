@@ -74,3 +74,7 @@ class MqttConnectionError(Exception):
 
 class PingException(Exception):
     """Handle pinging exceptions."""
+
+
+class BreakPoint(Exception):
+    """Custom exception used to trigger a specific stopping condition."""

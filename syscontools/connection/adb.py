@@ -252,6 +252,7 @@ class AdbConnection:
         if wakeup_screen:
             command_timeout = 4
             exception_return = True
+            self.wakeup_screen()
         try:
             res = self.run_shell_cmd(
                 "hostname", add_sleep=False, timeout=command_timeout

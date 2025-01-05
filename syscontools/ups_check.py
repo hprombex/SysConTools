@@ -69,7 +69,7 @@ class UPSCheck:
         """
         if self._nas_conn is None:
             nas_ip: str = NAS.get("ip")
-            username, password = prepare_login_and_password("nas", self.log)
+            username, password = prepare_login_and_password("nas")
             self._nas_conn = SSHConnection(
                 ip=nas_ip,
                 username=username,
@@ -88,7 +88,7 @@ class UPSCheck:
         """
         if self._ha_conn is None:
             homeassistant_ip: str = HOMEASSISTANT.get("ip")
-            username, password = prepare_login_and_password("ha", self.log)
+            username, password = prepare_login_and_password("ha")
             self._ha_conn = SSHConnection(
                 ip=homeassistant_ip,
                 username=username,
