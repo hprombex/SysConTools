@@ -22,7 +22,7 @@ import argparse
 from time import sleep, time
 from datetime import datetime
 
-from const_sec import (
+from const import (
     ALARM_CENTRAL_NUMBER,
     ALARM_SMS_MSG,
     MQTT_BROKER,

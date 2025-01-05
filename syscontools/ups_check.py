@@ -23,11 +23,11 @@ from time import sleep
 from connection.ping import Ping, PingResult
 from connection import SSHConnection, LocalConnection
 from connection.homeassistant_api import HomeAssistantAPI
-from const_sec import HOSTS_CHECK, HOMEASSISTANT, NAS, NAS_MAC, HENIEK_PC, LGTV
+from const import HOSTS_CHECK, HOMEASSISTANT, NAS, NAS_MAC, HENIEK_PC, LGTV
 
 from lsLog import Log
 from lsSecurity import Security
-from tools.support import wake_on_lan, get_ww
+from tools.support import wake_on_lan, get_ww, prepare_login_and_password
 from tools.thread_manager import ThreadManager
 
 
@@ -69,7 +69,7 @@ class UPSCheck:
         """
         if self._nas_conn is None:
             nas_ip: str = NAS.get("ip")
-            username, password = self._prepare_login_and_password("nas")
+            username, password = prepare_login_and_password("nas", self.log)
             self._nas_conn = SSHConnection(
                 ip=nas_ip,
                 username=username,
@@ -88,7 +88,7 @@ class UPSCheck:
         """
         if self._ha_conn is None:
             homeassistant_ip: str = HOMEASSISTANT.get("ip")
-            username, password = self._prepare_login_and_password("ha")
+            username, password = prepare_login_and_password("ha", self.log)
             self._ha_conn = SSHConnection(
                 ip=homeassistant_ip,
                 username=username,
@@ -141,25 +141,6 @@ class UPSCheck:
             self._ping = Ping(self.local_connection, logger=self.log)
 
         return self._ping
-
-    def _prepare_login_and_password(self, server_name: str) -> tuple[str, str]:
-        """
-        Prepares and retrieves login credentials for a specified server.
-
-        :param server_name: The name of the server for which login credentials are being prepared.
-                            This name is used to create unique security instances for login and password.
-        :return: Tuple containing the username and password for the specified server.
-        """
-        login_sec = Security(f"{server_name}_login", self.log)
-        passwd_sec = Security(f"{server_name}_pass", self.log)
-        username: str = login_sec.manage_phrase(
-            False, f"Please provide {server_name.upper()} username"
-        )
-        password: str = passwd_sec.manage_phrase(
-            False, f"Please provide {server_name.upper()} password"
-        )
-
-        return username, password
 
     def show_txt(self, sleep_time: int) -> None:
         """
@@ -517,6 +498,14 @@ class UPSCheck:
                     # If the reason is no longer valid, exit this loop to re-evaluate
                     # whether the NAS should remain powered on or turned off.
                     sleep(60)
+                else:
+                    # Handle case where the wake-up reason is no longer valid
+                    self.log.info(
+                        f"The wake-up reason: {reason_data.get('reason_type')} "
+                        f"{reason_data.get('reason_val')}"
+                        "is no longer valid."
+                    )
+                    sleep(300)  # 5 min - additional time before reassessment
 
             else:
                 if self.nas_is_online():
