@@ -196,7 +196,10 @@ class Log(metaclass=LogMetaclass):
 
         :param text: The message to log.
         """
-        self.log(logging.WARNING, text, txt_color="light_yellow")
+        try:
+            self.log(logging.WARNING, text, txt_color="light_yellow")
+        except KeyError:
+            self.log(logging.WARNING, text, txt_color="yellow")
 
     def fail(self, text: str, exc_info: bool = False) -> None:
         """
@@ -205,7 +208,14 @@ class Log(metaclass=LogMetaclass):
         :param exc_info: For a full stack trace.
         :param text: The message to log.
         """
-        self.log(logging.ERROR, text, txt_color="light_red", exc_info=exc_info)
+        try:
+            self.log(
+                logging.ERROR, text, txt_color="light_red", exc_info=exc_info
+            )
+        except KeyError:
+            self.log(
+                logging.ERROR, text, txt_color="red", exc_info=exc_info
+            )
 
     def debug(self, text: str, exc_info: bool = False) -> None:
         """

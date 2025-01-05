@@ -302,9 +302,7 @@ class SSHConnection:
         # Get suffixes for the current OS
         suffixes = command_suffixes.get(self._host_os_type)
         if not suffixes:
-            raise UnsupportedOSException(
-                f"Unsupported OS type: {self._host_os_type}"
-            )
+            raise UnsupportedOSException(self._host_os_type)
 
         # Determine the appropriate suffix
         if hide_stdout and hide_stderr:

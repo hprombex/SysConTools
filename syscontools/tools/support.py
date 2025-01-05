@@ -13,6 +13,13 @@
 """Support tools."""
 
 from datetime import date
+from time import strftime, localtime
+from typing import TYPE_CHECKING
+
+from lsSecurity import Security
+
+if TYPE_CHECKING:
+    from lsLog import Log
 
 
 def get_ww() -> str:
@@ -46,3 +53,33 @@ def wake_on_lan(mac_address: str) -> None:
     from wakeonlan import send_magic_packet
 
     send_magic_packet(mac_address)
+
+
+def prepare_login_and_password(server_name: str) -> tuple[str, str]:
+    """
+    Prepares and retrieves login credentials for a specified server.
+
+    :param server_name: The name of the server for which login credentials are being prepared.
+                        This name is used to create unique security instances for login and password.
+    :return: Tuple containing the username and password for the specified server.
+    """
+    login_sec = Security(f"{server_name}_login")
+    passwd_sec = Security(f"{server_name}_pass")
+    username: str = login_sec.manage_phrase(
+        False, f"Please provide {server_name.upper()} username"
+    )
+    password: str = passwd_sec.manage_phrase(
+        False, f"Please provide {server_name.upper()} password"
+    )
+
+    return username, password
+
+
+def get_formatted_timestamp(timestamp: float) -> str:
+    """
+    Format a timestamp to a human-readable format.
+
+    :param timestamp: The timestamp to format.
+    :return: Formatted timestamp as a string.
+    """
+    return strftime("%Y-%m-%d %H:%M:%S", localtime(timestamp))
