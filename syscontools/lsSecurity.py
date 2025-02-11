@@ -13,15 +13,14 @@
 """Module for Security class."""
 
 import base64
-import json
-import os
 import hashlib
+import json
+import logging
+import os
 from getpass import getpass
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.fernet import Fernet, InvalidToken
-
-from lsLog import Log
 
 
 class SecurityInvalidPasswordError(Exception):
@@ -48,7 +47,7 @@ class Security:
 
     JSON_FILE = "security_data.json"
 
-    def __init__(self, module_name: str = None, logger: Log = None):
+    def __init__(self, module_name: str = None):
         """
         Initializes a Security instance with optional module-specific settings for
         encryption and secure phrase management.
@@ -57,13 +56,7 @@ class Security:
                             This is used to create unique key and secure
                             phrase names. If provided, it appends a short hash
                             based on the module name to these file names.
-        :param logger: An optional Log instance for logging.
         """
-        if logger:
-            self.log = logger
-        else:
-            self.log = Log(store=False, timestamp=True)
-
         self._module_name = module_name
         self._fernet = None
         self._master_password: bytes = self._open_master_password()
