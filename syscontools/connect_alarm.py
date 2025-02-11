@@ -1,12 +1,22 @@
-# Copyright (c) 2020-2024 hprombex
+# Copyright (c) 2020-2025 hprombex
 #
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-# THE SOFTWARE.
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+# IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+# DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+# OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+# OR OTHER DEALINGS IN THE SOFTWARE.
 #
 # Author: hprombex
 
@@ -19,6 +29,7 @@ such as alarm status monitoring and authentication.
 """
 
 import argparse
+import logging
 from time import sleep, time
 from datetime import datetime
 
@@ -42,7 +53,9 @@ from cryptography.utils import CryptographyDeprecationWarning
 warnings.filterwarnings("ignore", category=CryptographyDeprecationWarning)
 
 from connection import LocalConnection, Ping, MQTTClient, AdbConnection
-from lsLog import Log
+
+
+logger = logging.getLogger(__name__)
 
 
 class ConnectAlarm:
@@ -55,19 +68,9 @@ class ConnectAlarm:
     Note: Based on API version: 9.0, check method get_rest_versions()
     """
 
-    def __init__(self, logger: Log = None):
-        """
-        Initializes the ConnectAlarm class with alarm system credentials.
-
-        :param logger: An optional Log instance for logging.
-        """
-        if logger:
-            self.log = logger
-        else:
-            self.log = Log(store=False)
-
+    def __init__(self):
+        """Initializes the ConnectAlarm class with alarm system credentials."""
         self._adb_port = 5555
-
         self._adb: "AdbConnection | None" = None
         self._alarm: "VisonicSetup | None" = None
         self._mqtt: "MQTTClient | None" = None
@@ -122,7 +125,7 @@ class ConnectAlarm:
         :param module_name: The name of the module for which the password is needed.
         :return: The password as a string, obtained by managing secure phrases.
         """
-        sec = Security(module_name.lower(), self.log)
+        sec = Security(module_name.lower())
         message = module_name.replace("_", " ")
         password = sec.manage_phrase(False, message)
         return password
@@ -135,7 +138,7 @@ class ConnectAlarm:
         :return: LocalConnection instance.
         """
         if self._local_conn is None:
-            self._local_conn = LocalConnection(logger=self.log)
+            self._local_conn = LocalConnection()
 
         return self._local_conn
 
@@ -152,7 +155,6 @@ class ConnectAlarm:
                 port=self.mqtt_port,
                 username=self.mqtt_username,
                 password=self.mqtt_password,
-                logger=self.log,
             )
 
         return self._mqtt
@@ -164,7 +166,7 @@ class ConnectAlarm:
 
         :return: A string indicating the connection status, either "online" or "offline".
         """
-        self.log.info("Get connection status.")
+        logger.info("Get connection status.")
         connection_status = "online" if self.alarm.connected() else "offline"
         if connection_status != self._connection_status:
             self._connection_status = connection_status
@@ -179,7 +181,7 @@ class ConnectAlarm:
 
         :return: A string indicating the current alarm status ("on", "off").
         """
-        self.log.info("Get alarm status.")
+        logger.info("Get alarm status.")
         alarm_status = self.get_last_status()
         if alarm_status != self._alarm_status:
             self._alarm_status = alarm_status
@@ -194,7 +196,7 @@ class ConnectAlarm:
         :param host_ip: The IP address of the destination host to ping.
         :return: True if the host is reachable, otherwise False.
         """
-        ping = Ping(self.local_connection, logger=self.log)
+        ping = Ping(self.local_connection)
         out = ping.run(host_ip, count=1)
         return True if out.pass_count == 1 else False
 
@@ -213,7 +215,7 @@ class ConnectAlarm:
         messages.
         """
         if self.connection_status == "online":
-            self.log.info(
+            logger.info(
                 "Alarm central is already online, no need to send wakeup SMS."
             )
             return
@@ -225,9 +227,7 @@ class ConnectAlarm:
             if not self.is_host_connected(ip):
                 continue  # Host is not connected, skip to the next host
 
-            self._adb = AdbConnection(
-                adb_ip=ip, adb_port=self._adb_port, logger=self.log
-            )
+            self._adb = AdbConnection(adb_ip=ip, adb_port=self._adb_port)
             self._adb.connect()  # connect to ADB device
             sleep(2)
             self._adb.wait_for_device()
@@ -238,7 +238,7 @@ class ConnectAlarm:
                 # SMS status successfully set to 'standby' and connection is 'online'
                 return
 
-            self.log.info(f"Sending SMS to {ALARM_CENTRAL_NUMBER} via ADB")
+            logger.info(f"Sending SMS to {ALARM_CENTRAL_NUMBER} via ADB")
             for _ in range(5):  # try to send SMS X times
                 self._publish_alarm_sms_status("running")
 
@@ -322,13 +322,13 @@ class ConnectAlarm:
         :return: The current alarm status.
         """
         max_attempts = 10  # number of attempts to check the status
-        self.log.info(f"Waiting for alarm status to change to '{status}'")
+        logger.info(f"Waiting for alarm status to change to '{status}'")
         for _ in range(max_attempts):
             current_status = self.alarm_status
             exp_status = self._parse_alarm_status(status)
             if exp_status == current_status:
                 break
-            self.log.info(
+            logger.info(
                 f"Current alarm status is '{current_status}', waiting for '{exp_status}'"
             )
             sleep(5)  # wait fot status change
@@ -369,13 +369,13 @@ class ConnectAlarm:
 
     def run_disable_alarm(self) -> None:
         """Disables the alarm system."""
-        self.log.info("Disable alarm.")
+        logger.info("Disable alarm.")
         for _ in range(5):
             try:
                 self.alarm.disarm()
             except PanelNotConnectedError as e:
                 msg = f"Disable alarm failed - {e}"
-                self.log.warning(msg)
+                logger.warning(msg)
                 self.dmesg_msg(msg)
                 self.send_wakeup_sms()
                 continue
@@ -384,13 +384,13 @@ class ConnectAlarm:
 
     def run_enable_alarm(self):
         """Enables the alarm system."""
-        self.log.info("Enable alarm.")
+        logger.info("Enable alarm.")
         for _ in range(5):
             try:
                 self.alarm.arm_away()
             except PanelNotConnectedError as e:
                 msg = f"Enable alarm failed - {e}"
-                self.log.warning(msg)
+                logger.warning(msg)
                 self.dmesg_msg(msg)
                 self.send_wakeup_sms()
                 continue
@@ -399,13 +399,13 @@ class ConnectAlarm:
 
     def run_enable_nightmode_alarm(self):
         """Enables the alarm system in night mode."""
-        self.log.info("Enable nightmode alarm.")
+        logger.info("Enable nightmode alarm.")
         for _ in range(5):
             try:
                 self.alarm.arm_night()
             except PanelNotConnectedError as e:
                 msg = f"Enable nightmode alarm failed - {e}"
-                self.log.warning(msg)
+                logger.warning(msg)
                 self.dmesg_msg(msg)
                 self.send_wakeup_sms()
                 continue
