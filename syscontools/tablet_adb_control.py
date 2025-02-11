@@ -1,19 +1,29 @@
 # Copyright (c) 2020-2024 hprombex
 #
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-# THE SOFTWARE.
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+# IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+# DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+# OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+# OR OTHER DEALINGS IN THE SOFTWARE.
 #
 # Author: hprombex
 
 """
-This module provides an API for interacting with a tablet using ADB (Android Debug Bridge).
-It offers various functionalities such as controlling apps, managing the screen, device settings,
-and system operations via ADB.
+This module provides a control interface for interacting with a tablet using
+ADB (Android Debug Bridge). It offers various functionalities such as controlling
+apps, managing the screen, device settings, and system operations via ADB.
 """
 
 import argparse
@@ -27,23 +37,13 @@ from cryptography.utils import CryptographyDeprecationWarning
 warnings.filterwarnings("ignore", category=CryptographyDeprecationWarning)
 
 from connection.adb import AdbConnection
-from lsLog import Log
 
 
-class TabletAdbApi:
-    """API for interacting with a tablet via ADB."""
+class TabletAdbControl:
+    """Control interface for interacting with a tablet via ADB."""
 
-    def __init__(self, logger: Log = None):
-        """
-        Initialize the TabletAdbApi class.
-
-        :param logger: An instance of the Log class for logging.
-                       If not provided, a default logger is used.
-        """
-        if logger:
-            self.log = logger
-        else:
-            self.log = Log(store=False)
+    def __init__(self):
+        """Initialize the TabletAdbControl class."""
 
         self._adb: "AdbConnection | None" = None
         self.adb_port: int = 5555
@@ -59,7 +59,7 @@ class TabletAdbApi:
         """
         if self._adb is None:
             self._adb = AdbConnection(
-                adb_ip=self.adb_ip, adb_port=self.adb_port, logger=self.log
+                adb_ip=self.adb_ip, adb_port=self.adb_port
             )
         return self._adb
 
@@ -252,10 +252,9 @@ class TabletAdbApi:
             self.restart_wallpanel_app()
 
         if args.set_volume_level:
-            self.log.info(f"Set volume level: {args.set_volume_level}")
             self.adb.set_volume_level(args.set_volume_level)
 
 
 if __name__ == "__main__":
-    tablet_adb = TabletAdbApi()
+    tablet_adb = TabletAdbControl()
     tablet_adb.main()
