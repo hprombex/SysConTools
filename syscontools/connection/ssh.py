@@ -1,12 +1,22 @@
-# Copyright (c) 2024 hprombex
+# Copyright (c) 2024-2025 hprombex
 #
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-# THE SOFTWARE.
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+# IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+# DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+# OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+# OR OTHER DEALINGS IN THE SOFTWARE.
 #
 # Author: hprombex
 
@@ -31,13 +41,12 @@ from typing import Any
 from paramiko import SSHException, SSHClient, WarningPolicy
 from paramiko.client import MissingHostKeyPolicy, AutoAddPolicy
 
-from exceptions import (
+from custom_exceptions import (
     SSHRedirectionError,
     SSHConnectionFailedException,
     SSHConnectionError,
     UnsupportedOSException,
 )
-from lsLog import Log
 from connection.utils import (
     Proc,
     ExeProc,
@@ -49,6 +58,8 @@ from connection.utils import (
 
 logging.getLogger("paramiko").setLevel(logging.WARNING)
 logging.getLogger("paramiko.transport").setLevel(logging.CRITICAL)
+
+logger = logging.getLogger(__name__)
 
 
 class SSHConnection:
@@ -79,7 +90,6 @@ class SSHConnection:
         password: str = None,
         key_path: None = None,
         skip_key_verification: bool = True,
-        logger: Log = None,
     ) -> None:
         """
         Initialize an SSH connection with the provided parameters.
@@ -93,14 +103,7 @@ class SSHConnection:
             authentication. If not provided, password-based authentication is used.
         :param skip_key_verification: If True, disables host key verification
             by using a permissive policy. (StrictHostKeyChecking=no)
-        :param logger: Optional logger instance for logging activities.
-            If none is provided, a default logger will be initialized.
         """
-        if logger:
-            self.log = logger
-        else:
-            self.log = Log(store=False, timestamp=True)
-
         self._enable_sudo: bool = False
         self._host_os_type: OsType | None = None
         self._ip: str = str(ip)
@@ -159,7 +162,7 @@ class SSHConnection:
         self._ssh_client.connect(**self._ssh_config, compress=True)
         transport = str(self._ssh_client.get_transport())
         if "awaiting auth" in transport:
-            self.log.info("SSH server requested additional authentication")
+            logger.info("SSH server requested additional authentication")
             self._ssh_client.get_transport().auth_interactive_dumb(
                 self._ssh_config["username"]
             )
@@ -175,13 +178,13 @@ class SSHConnection:
         Attempt to re-establish the SSH connection.
         :raises SSHConnectionFailedException: If the SSH connection cannot be re-established.
         """
-        self.log.warning(
+        logger.warning(
             f"Connection lost to {self._ip}, attempting to reconnect..."
         )
         self._connect()
         if not self._ssh_client.get_transport().is_active():
             raise SSHConnectionFailedException(self._ip)
-        self.log.success(f"Successfully reconnected to {self._ip}.")
+        logger.info(f"Successfully reconnected to {self._ip}.")
 
     @property
     def remote_connection(self) -> SSHClient:
@@ -242,7 +245,7 @@ class SSHConnection:
                 "sudo echo mem > /sys/power/state",
             ],
         }
-        self.log.info(f"Sleep host {self._ip}")
+        logger.info(f"Sleep host {self._ip}")
         for cmd in sleep_cmds[self._host_os_type]:
             self.run_cmd(cmd)
         sleep(5)
@@ -256,7 +259,7 @@ class SSHConnection:
             OsType.WINDOWS: "powercfg /hibernate on & rundll32.exe powrprof.dll,SetSuspendState 0,1,0",
             OsType.LINUX: "echo disk > /sys/power/state",
         }
-        self.log.info(f"Hibernate host {self._ip}")
+        logger.info(f"Hibernate host {self._ip}")
         self.run_cmd(hibernate_cmd[self._host_os_type])
         sleep(5)
 
@@ -383,7 +386,7 @@ class SSHConnection:
                 stdout_pipe_output, encoding="utf-8", errors="ignore"
             )
             if stdout and not quiet_mode:
-                self.log.out(f"output: \nstdout>>\n{stdout}")
+                logger.debug(f"output: \nstdout>>\n{stdout}")
 
         if proc.stderr:
             stderr_pipe_output = proc.stderr.read()
@@ -391,7 +394,7 @@ class SSHConnection:
                 stderr_pipe_output, encoding="utf-8", errors="ignore"
             )  # backslashreplace or ignore?
             if stderr and not quiet_mode:
-                self.log.out(f"stderr>>\n{stderr}")
+                logger.debug(f"stderr>>\n{stderr}")
 
         if sudo:
             self._enable_sudo = False
@@ -451,7 +454,7 @@ class SSHConnection:
             self._enable_sudo = True
 
         if not quiet_mode:
-            self.log.debug(f'Host: {self._ip}  cmd: "{cmd}" cwd: {cwd}')
+            logger.debug(f'Host: {self._ip}  cmd: "{cmd}" cwd: {cwd}')
 
         verify_cmd(cmd)
 
