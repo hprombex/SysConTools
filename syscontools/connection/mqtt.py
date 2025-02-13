@@ -1,12 +1,22 @@
-# Copyright (c) 2024 hprombex
+# Copyright (c) 2024-2025 hprombex
 #
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-# THE SOFTWARE.
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+# IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+# DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+# OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+# OR OTHER DEALINGS IN THE SOFTWARE.
 #
 # Author: hprombex
 
@@ -15,12 +25,18 @@ This module connecting to an MQTT broker and handling message publishing,
 subscribing, and receiving.
 """
 
+import logging
 import uuid
 from time import sleep
 import paho.mqtt.client as mqtt
 from connection.utils import check_connection, ReceiveMessage, Subscription
-from exceptions import MqttConnectionError
-from lsLog import Log
+from custom_exceptions import MqttConnectionError
+
+
+logger = logging.getLogger(__name__)
+
+
+type PublishMessageType = str | bytes | int | float | None
 
 
 class MQTTClient:
@@ -51,7 +67,6 @@ class MQTTClient:
         username: str,
         password: str,
         protocol: int = mqtt.MQTTv311,
-        logger: "Log" = None,
     ):
         """
         Initializes an MQTTClient instance.
@@ -64,17 +79,11 @@ class MQTTClient:
         :param username: The username for authenticating with the MQTT broker.
         :param password: The password for authenticating with the MQTT broker.
         :param protocol: The MQTT protocol version to use. Default is 'mqtt.MQTTv311'.
-        :param logger: An optional logging object. If not provided, a default logger is created.
         """
         self.broker = broker
         self.port = port
         self.username = username
         self.password = password
-
-        if logger:
-            self.log = logger
-        else:
-            self.log = Log(store=False, timestamp=True)
 
         try:
             base62 = getattr(mqtt, "_base62")
@@ -83,7 +92,7 @@ class MQTTClient:
             base62 = mqtt.base62
 
         self.client_id = base62(uuid.uuid4().int, padding=22)
-        self.client = mqtt.Client(
+        self.client: mqtt.Client = mqtt.Client(
             client_id=self.client_id, protocol=protocol
         )
         self.client.username_pw_set(self.username, self.password)
@@ -116,7 +125,7 @@ class MQTTClient:
         """
         result_code = None
         for retry in range(retry_attempts):
-            self.log.info(
+            logger.info(
                 f"Connected to MQTT broker at {self.broker}:{self.port}"
             )
             result_code = self.client.connect(self.broker, self.port)
@@ -132,7 +141,11 @@ class MQTTClient:
 
     @check_connection
     def publish(
-        self, topic: str, message: str, qos: int = 0, retain: bool = True
+        self,
+        topic: str,
+        message: PublishMessageType,
+        qos: int = 0,
+        retain: bool = True,
     ) -> None:
         """
         Publishes a message to the specified MQTT topic.
@@ -146,8 +159,10 @@ class MQTTClient:
         :param retain: Whether to retain the message.
             If True, the message will be stored by the broker and sent to future subscribers.
         """
-        self.client.publish(topic, message, qos, retain)
-        self.log.info(f"Message '{message}' sent to topic '{topic}'")
+        self.client.publish(
+            topic=topic, payload=message, qos=qos, retain=retain
+        )
+        logger.info(f"Message '{message}' sent to topic '{topic}'")
 
     @check_connection
     def subscribe(self, topic: str) -> None:
@@ -158,13 +173,11 @@ class MQTTClient:
             The client will receive messages published to this topic.
         """
         self.client.subscribe(topic)
-        self.log.info(f"Subscribed to topic '{topic}'")
+        logger.info(f"Subscribed to topic '{topic}'")
         self.client.loop_forever()  # Wait for incoming messages
 
     @check_connection
-    def subscribe_single(
-        self, topic: str, wait_time: int = 5
-    ) -> str:
+    def subscribe_single(self, topic: str, wait_time: int = 5) -> str:
         """
         Subscribes to a specified MQTT topic, receives a single message, and returns it.
 
@@ -211,7 +224,7 @@ class MQTTClient:
         """
         result_code = self.client.disconnect()
         if result_code == mqtt.MQTT_ERR_SUCCESS:
-            self.log.info("Disconnected from MQTT broker.")
+            logger.info("Disconnected from MQTT broker.")
             self.connected = False
 
     def mqtt_on_message(
@@ -242,7 +255,7 @@ class MQTTClient:
         except UnicodeDecodeError:
             # _topic is a private variable in MQTTMessage class
             bare_topic: bytes = getattr(msg, "_topic")
-            self.log.fail(
+            logger.warning(
                 f"Skipping received{' retained' if msg.retain else ''} message on invalid"
                 f" topic {bare_topic} (qos={msg.qos}): {msg.payload[0:8192]}"
             )
@@ -256,11 +269,11 @@ class MQTTClient:
             payload = msg.payload.decode(subscription.encoding)
             self._received_message = payload
         except (AttributeError, UnicodeDecodeError):
-            self.log.fail(
+            logger.warning(
                 f"Can't decode payload {msg.payload[0:8192]} on {topic} with encoding {subscription.encoding}"
             )
 
-        self.log.info(
+        logger.info(
             f"Received{' retained' if msg.retain else ''} message on {topic} (qos={msg.qos}): {payload[0:8192]}"
         )
 

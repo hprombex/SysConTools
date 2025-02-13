@@ -1,12 +1,22 @@
-# Copyright (c) 2020-2024 hprombex
+# Copyright (c) 2020-2025 hprombex
 #
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-# THE SOFTWARE.
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+# IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+# DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+# OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+# OR OTHER DEALINGS IN THE SOFTWARE.
 #
 # Author: hprombex
 
@@ -16,11 +26,12 @@ in separate background threads. It handles starting threads, managing active
 threads, and waiting for them to finish.
 """
 
+import logging
 import uuid
 from threading import Thread
 from typing import Callable
 
-from lsLog import Log
+logger = logging.getLogger(__name__)
 
 
 class ThreadManager:
@@ -30,19 +41,9 @@ class ThreadManager:
     when needed.
     """
 
-    def __init__(self, logger: Log = None):
-        """
-        Initializes the ThreadManager instance.
-
-        :param logger: Optional logger instance to use for logging thread activities.
-                       If not provided, a default logger is created.
-        """
+    def __init__(self):
+        """Initializes the ThreadManager instance."""
         self.threads: list[Thread] = []
-
-        if logger:
-            self.log = logger
-        else:
-            self.log = Log(store=False)
 
     def run_in_background(
         self,
@@ -62,7 +63,7 @@ class ThreadManager:
             # Generate a unique 8-character ID
             thread_id = uuid.uuid4().hex[:8]
             thread_name = f"{method.__name__}_{thread_id}"
-            self.log.info(
+            logger.info(
                 f"Starting method: {method.__name__} with args: "
                 f"{some_args} in background as {thread_name}."
             )
@@ -77,7 +78,7 @@ class ThreadManager:
             return thread
 
         except Exception as e:
-            self.log.error(
+            logger.error(
                 f"Failed to start method {method.__name__} "
                 f"in background: {e}",
                 exc_info=True,
@@ -96,13 +97,13 @@ class ThreadManager:
         :param thread: The thread to stop.
         """
         if thread.is_alive():
-            self.log.info(f"Stopping thread {thread.name}")
+            logger.info(f"Stopping thread {thread.name}")
             thread.join(1)
             self.threads.remove(thread)
 
     def stop_all(self) -> None:
         """Stops all running threads by attempting to join them with a timeout."""
-        self.log.info("Stopping all running threads.")
+        logger.info("Stopping all running threads.")
         for thread in self.running_threads():
             self.stop(thread)
 

@@ -14,12 +14,8 @@
 
 from datetime import date
 from time import strftime, localtime
-from typing import TYPE_CHECKING
 
 from lsSecurity import Security
-
-if TYPE_CHECKING:
-    from lsLog import Log
 
 
 def get_ww() -> str:

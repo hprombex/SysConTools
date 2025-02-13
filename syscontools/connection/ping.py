@@ -1,12 +1,22 @@
-# Copyright (c) 2024 hprombex
+# Copyright (c) 2024-2025 hprombex
 #
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-# THE SOFTWARE.
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+# IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+# DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+# OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+# OR OTHER DEALINGS IN THE SOFTWARE.
 #
 # Author: hprombex
 
@@ -19,8 +29,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from connection.utils import OsType
-from exceptions import PingException
-from lsLog import Log
+from custom_exceptions import PingException
 
 if TYPE_CHECKING:
     from connection import SSHConnection, LocalConnection
@@ -55,21 +64,13 @@ class Ping:
     >>>"PingResult(pass_count=2, fail_count=0, packets_transmitted=2, packets_received=2)"
     """
 
-    def __init__(
-        self, connection: SSHConnection | LocalConnection, logger: Log = None
-    ):
+    def __init__(self, connection: SSHConnection | LocalConnection):
         """
         Initialize the Ping instance.
 
         :param connection: The connection object to use for executing the ping command.
-        :param logger: An optional logger instance for logging ping operation details.
         """
         self._connection = connection
-
-        if logger:
-            self.log = logger
-        else:
-            self.log = Log(store=False)
 
     def run(
         self, dst_host_ip: str, count: int = 5, ping_interval: int = 200

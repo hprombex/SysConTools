@@ -1,12 +1,22 @@
-# Copyright (c) 2024 hprombex
+# Copyright (c) 2024-2025 hprombex
 #
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-# THE SOFTWARE.
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+# IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+# DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+# OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+# OR OTHER DEALINGS IN THE SOFTWARE.
 #
 # Author: hprombex
 
@@ -18,6 +28,10 @@ and ensures Home Assistant (HA) and other local devices are appropriately manage
 during power outages or restorations.
 """
 
+import logging
+import os
+from datetime import datetime
+from pathlib import Path
 from time import sleep
 
 from connection.ping import Ping, PingResult
@@ -25,10 +39,24 @@ from connection import SSHConnection, LocalConnection
 from connection.homeassistant_api import HomeAssistantAPI
 from const import HOSTS_CHECK, HOMEASSISTANT, NAS, NAS_MAC, HENIEK_PC, LGTV
 
-from lsLog import Log
 from lsSecurity import Security
 from tools.support import wake_on_lan, get_ww, prepare_login_and_password
 from tools.thread_manager import ThreadManager
+
+
+file_stem = Path(__file__).stem
+log_directory = Path(__file__).with_name(f"{file_stem}_logs")
+log_file = log_directory / f"{file_stem}_{datetime.now():%H_%M_%d_%m_%Y}.log"
+os.makedirs(log_directory, exist_ok=True)
+
+logger = logging.getLogger(__name__)
+console = logging.StreamHandler()
+file_handler = logging.FileHandler(log_file)
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s [%(name)6.8s:%(lineno)4d][%(levelname)-5.5s]: %(message)s",
+    handlers=[console, file_handler],
+)
 
 
 class UPSCheck:
@@ -37,12 +65,8 @@ class UPSCheck:
     sending Wake-on-LAN signals, shutting down or sleeping the NAS, and verifying its online status.
     """
 
-    def __init__(self, logger: "Log" = None):
-        """
-        Initialize the UPSCheck class with necessary components and connections.
-
-        :param logger: Optional logger instance for logging events.
-        """
+    def __init__(self):
+        """Initialize the UPSCheck class with necessary components and connections."""
         self._ha_url: str = f"http://{HOMEASSISTANT.get('ip')}:8123/"
         self._nas_conn: SSHConnection | None = None
         self._ha_conn: SSHConnection | None = None
@@ -54,11 +78,6 @@ class UPSCheck:
 
         self._electricity_thread_name: str = "electricity_scan"
         self._nas_thread_name: str = "nas_power_management"
-
-        if logger:
-            self.log = logger
-        else:
-            self.log = Log(store=False, timestamp=True)
 
     @property
     def nas_connection(self) -> SSHConnection:
@@ -74,7 +93,6 @@ class UPSCheck:
                 ip=nas_ip,
                 username=username,
                 password=password,
-                logger=self.log,
             )
 
         return self._nas_conn
@@ -87,58 +105,41 @@ class UPSCheck:
         :return: SSH Connection instance.
         """
         if self._ha_conn is None:
-            homeassistant_ip: str = HOMEASSISTANT.get("ip")
+            ha_ip: str = HOMEASSISTANT.get("ip")
             username, password = prepare_login_and_password("ha")
             self._ha_conn = SSHConnection(
-                ip=homeassistant_ip,
+                ip=ha_ip,
                 username=username,
                 password=password,
-                logger=self.log,
             )
 
         return self._ha_conn
 
     @property
-    def homeassistant_api(self) -> HomeAssistantAPI:
+    def ha_api(self) -> HomeAssistantAPI:
         """
         Establish a connection to HA API.
 
         :return: HomeAssistantAPI instance.
         """
         if self._ha_api is None:
-            token_sec = Security("token_pass", self.log)
+            token_sec = Security("token_pass")
             token: str = token_sec.manage_phrase(
                 False, "Please provide Home Assistant token"
             )
-            self._ha_api = HomeAssistantAPI(
-                self._ha_url,
-                token,
-                logger=self.log,
-            )
+            self._ha_api = HomeAssistantAPI(self._ha_url, token)
 
         return self._ha_api
 
     @property
-    def local_connection(self) -> LocalConnection:
-        """
-        Initializes and returns a LocalConnection instance.
-
-        :return: LocalConnection instance.
-        """
-        if self._local_conn is None:
-            self._local_conn = LocalConnection(logger=self.log)
-
-        return self._local_conn
-
-    @property
     def ping(self) -> Ping:
         """
-        Initializes and returns a LocalConnection instance.
+        Initializes and returns a Ping instance.
 
-        :return: LocalConnection instance.
+        :return: Ping instance.
         """
         if self._ping is None:
-            self._ping = Ping(self.local_connection, logger=self.log)
+            self._ping = Ping(connection=LocalConnection())
 
         return self._ping
 
@@ -164,7 +165,7 @@ class UPSCheck:
         pass_msg_to_print: str = ""
 
         sleep(sleep_time)
-        self.log.info(f"WW: {get_ww()}")
+        logger.info(f"WW: {get_ww()}")
 
         for host in HOSTS_CHECK:
             out = self.ping.run(host.get("ip"), count=1)
@@ -180,15 +181,13 @@ class UPSCheck:
                 offline_count += 1
 
         # Log the summary of results after checking all hosts
-        self.log.info(
+        logger.info(
             f"Checked {total_hosts} hosts: {online_count} ONLINE, "
             f"{offline_count} OFFLINE"
         )
 
-        self.log.timestamp = False
-        self.log.success(pass_msg_to_print.lstrip("\n"))
-        self.log.fail(fail_msg_to_print.lstrip("\n"))
-        self.log.timestamp = True
+        logger.info(pass_msg_to_print.lstrip("\n"))
+        logger.error(fail_msg_to_print.lstrip("\n"))
 
     def run(self, sleep_time: int = 30) -> None:
         """
@@ -198,7 +197,7 @@ class UPSCheck:
 
         :param sleep_time: The interval in seconds between each status check.
         """
-        thread_manager = ThreadManager(logger=self.log)
+        thread_manager = ThreadManager()  # TODO change to Threadpool
 
         while True:
             # Ensure the NAS power management thread is running
@@ -248,13 +247,13 @@ class UPSCheck:
                 # Disable emergency power-off mode when electricity is restored
                 self._emergency_poweroff = False
             else:
-                self.log.info("Electricity not detected. Entering wait mode.")
+                logger.info("Electricity not detected. Entering wait mode.")
                 for _ in range(max_wait):
                     sleep(60)  # 1 min scan interval
                     if self.is_electricity():
                         # If electricity is restored during the waiting period,
                         # reset the emergency flag
-                        self.log.info(
+                        logger.info(
                             "Electricity restored during wait. Resuming normal operations."
                         )
                         self._emergency_poweroff = False
@@ -264,11 +263,11 @@ class UPSCheck:
                     if self.nas_is_online():
                         # Disable camera FTP upload before NAS shutdown
                         self.setup_camera_ftp_upload(False)
-                        self.log.info(
+                        logger.info(
                             "Electricity still unavailable. Shutting down NAS."
                         )
                         self.nas_shutdown()
-                    self.log.warning(
+                    logger.warning(
                         "Emergency power-off was activated due to an extended "
                         "electricity outage."
                     )
@@ -290,7 +289,7 @@ class UPSCheck:
         :return: True if the electricity is available (state is "OL"), False otherwise.
         """
         entity = "sensor.greencell_dane_stanu"
-        entity_value = self.homeassistant_api.get_entity_value(entity=entity)
+        entity_value = self.ha_api.get_entity_value(entity=entity)
         if entity_value != "OL":  # OL or OB ("on line" or "on battery")
             return False
         return True
@@ -346,7 +345,7 @@ class UPSCheck:
         max_pings = 5
         max_attempts = 5
         for attempt in range(max_attempts):
-            self.log.info(
+            logger.info(
                 f"Shutdown NAS (Attempt: {attempt + 1}/{max_attempts})"
             )
             self.nas_connection.shutdown_host()
@@ -365,10 +364,10 @@ class UPSCheck:
         max_pings: int = 10
         max_attempts: int = 10
         for attempt in range(max_attempts):
-            self.log.info(f"Wake up NAS (Attempt: {attempt + 1})")
+            logger.info(f"Wake up NAS (Attempt: {attempt + 1})")
             wake_on_lan(NAS_MAC)
             sleep(45)  # Usually, NAS wakes up after 70sec
-            self.log.info("Waiting for NAS to wake up.")
+            logger.info("Waiting for NAS to wake up.")
             if self.nas_is_online(ping_count=max_pings, all_fail=False):
                 break
 
@@ -398,7 +397,7 @@ class UPSCheck:
         # Check for emergency power-off condition
         if self._emergency_poweroff:
             # If emergency power off is active, do not attempt to wake up the NAS
-            self.log.warning(
+            logger.warning(
                 "Emergency power-off detected. "
                 "Aborting the search for a reason to wake up the NAS."
             )
@@ -410,25 +409,25 @@ class UPSCheck:
             host_name: str = host.get("name")
             out = self.ping.run(destination_ip, count=ping_count)
             if out.pass_count >= expected_ping_count:  # reason to turn ON NAS
-                self.log.success(
+                logger.info(
                     f"Ping result destination IP {destination_ip} ({host_name}) passed."
                 )
                 return {"reason_type": "ping", "reason_val": destination_ip}
             else:
-                self.log.fail(
+                logger.error(
                     f"Ping result destination IP {destination_ip} ({host_name}) failed."
                 )
 
         # Second reasons
         for entity in ["input_boolean.nas_on"]:
-            entity_value: str = self.homeassistant_api.get_entity_value(
+            entity_value: str = self.ha_api.get_entity_value(
                 entity=entity, key="state"
             )
             if entity_value == "on":  # reason to turn ON NAS
-                self.log.success(f"Entity: {entity} status: {entity_value}.")
+                logger.info(f"Entity: {entity} status: {entity_value}.")
                 return {"reason_type": "entity", "reason_val": entity}
             else:
-                self.log.fail(f"Entity: {entity} status: {entity_value}.")
+                logger.error(f"Entity: {entity} status: {entity_value}.")
 
         return {}  # turn OFF NAS
 
@@ -452,7 +451,7 @@ class UPSCheck:
             if result.pass_count <= 3:
                 return False
         else:
-            entity_value = self.homeassistant_api.get_entity_value(
+            entity_value = self.ha_api.get_entity_value(
                 reason_data.get("reason_val")
             )
             if entity_value != "on":
@@ -467,7 +466,7 @@ class UPSCheck:
         :param enable: The desired state for the FTP upload switch,
                        True is 'on', False is 'off'.
         """
-        self.homeassistant_api.post(
+        self.ha_api.post(
             entity="switch.e1_zoom_ftp_upload",
             data={"state": "on" if enable else "off"},
         )
@@ -487,7 +486,7 @@ class UPSCheck:
                 # Enable camera FTP upload after NAS wakes up
                 self.setup_camera_ftp_upload(enable=True)
 
-                self.log.info(
+                logger.info(
                     f"NAS is online - sleeping for {sleep_time // 60} minutes."
                 )
                 # Allow extra time for the NAS to stabilize after waking up
@@ -500,7 +499,7 @@ class UPSCheck:
                     sleep(60)
                 else:
                     # Handle case where the wake-up reason is no longer valid
-                    self.log.info(
+                    logger.info(
                         f"The wake-up reason: {reason_data.get('reason_type')} "
                         f"{reason_data.get('reason_val')}"
                         "is no longer valid."
@@ -516,7 +515,7 @@ class UPSCheck:
             sleep(5)  # sleep between checks
 
             while self._emergency_poweroff:
-                self.log.warning(
+                logger.warning(
                     "Emergency power off detected. "
                     "Waiting for power to be restored."
                 )
