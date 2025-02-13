@@ -1,12 +1,22 @@
-# Copyright (c) 2022-2024 hprombex
+# Copyright (c) 2022-2025 hprombex
 #
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-# THE SOFTWARE.
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+# IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+# DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+# OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+# OR OTHER DEALINGS IN THE SOFTWARE.
 #
 # Author: hprombex
 
@@ -23,11 +33,11 @@ from time import sleep
 
 from connection import LocalConnection, SSHConnection
 from connection.utils import OsType, ExeProc, is_root_available
-from lsLog import Log
-
 
 logging.getLogger("paramiko").setLevel(logging.WARNING)
 logging.getLogger("paramiko.transport").setLevel(logging.CRITICAL)
+
+logger = logging.getLogger(__name__)
 
 
 class AdbConnection:
@@ -35,8 +45,6 @@ class AdbConnection:
     Manage ADB connections to an Android device and provide
     methods to control device functions.
     """
-
-    BASIC_SLEEP_TIME = 0.5
 
     def __init__(
         self,
@@ -48,7 +56,6 @@ class AdbConnection:
         controller_password: str = None,
         controller_key_path: None = None,
         controller_skip_key_verification: bool = True,
-        logger: Log = None,
     ) -> None:
         """
         Initialize the ADB connection with the specified parameters.
@@ -61,7 +68,6 @@ class AdbConnection:
         :param controller_password: Password for SSH connection.
         :param controller_key_path: Path to the SSH key for authentication.
         :param controller_skip_key_verification: Whether to skip SSH key verification.
-        :param logger: Logger instance for logging messages.
         """
         self._adb_ip = adb_ip
         self._adb_port = adb_port
@@ -69,16 +75,9 @@ class AdbConnection:
         self._root_permissions = None
         self.connected = False
 
-        if logger:
-            self.log = logger
-        else:
-            self.log = Log(store=False)
-
         if controller_ip == "localhost":
             # initialize local connection class
-            self.controller_conn = LocalConnection(
-                ip=controller_ip, logger=self.log
-            )
+            self.controller_conn = LocalConnection(ip=controller_ip)
         else:
             # initialize SSH connection class
             self.controller_conn = SSHConnection(
@@ -88,7 +87,6 @@ class AdbConnection:
                 password=controller_password,
                 key_path=controller_key_path,
                 skip_key_verification=controller_skip_key_verification,
-                logger=self.log,
             )
 
     def __str__(self) -> str:
@@ -173,7 +171,7 @@ class AdbConnection:
         )
 
         if add_sleep:
-            sleep(self.BASIC_SLEEP_TIME)
+            sleep(0.5)
 
         return result
 
@@ -224,7 +222,7 @@ class AdbConnection:
         :param retry: Number of attempts to connect to the device.
         """
         for i in range(retry):
-            self.log.info(
+            logger.info(
                 f"Connecting to {self._adb_ip}:{self._adb_port} {i + 1}/{retry}"
             )
             res = self.run_cmd(f"connect {self._adb_ip}:{self._adb_port}")
@@ -280,7 +278,7 @@ class AdbConnection:
             self.run_cmd("wait-for-device", timeout=timeout)
             return True
         except TimeoutExpired as e:
-            self.log.debug(str(e))
+            logger.debug(str(e))
             return False
 
     def restart_adb_server(self) -> None:
@@ -394,7 +392,7 @@ class AdbConnection:
         :param phone_number: The recipient's phone number.
         :param message: The SMS message content to be sent.
         """
-        self.log.info(f"Sending SMS to {phone_number}...")
+        logger.info(f"Sending SMS to {phone_number}...")
 
         sms_cmd = (  # Tested on Android 10 and Android 12
             'service call isms 5 i32 0 s16 "com.android.mms.service" '
@@ -403,11 +401,11 @@ class AdbConnection:
         )
         result = self.run_shell_cmd(sms_cmd, as_root=False)
         if result.return_code:
-            self.log.warning(
+            logger.warning(
                 f"Failed to send SMS to {phone_number}: {result.stderr}"
             )
         else:
-            self.log.info(f"SMS successfully sent to {phone_number}")
+            logger.info(f"SMS successfully sent to {phone_number}")
 
     def home_screen(self) -> None:
         """
@@ -448,14 +446,14 @@ class AdbConnection:
         attempt to reconnect.
         """
         try:
-            self.log.info(f"Reboot {self._adb_ip}")
+            logger.info(f"Reboot {self._adb_ip}")
             self.run_cmd("reboot", timeout=120, add_sleep=True)
         except TimeoutExpired:
             self.connected = False
-            self.log.info("Wait 30s for device boot.")
+            logger.info("Wait 30s for device boot.")
             sleep(30)
 
-            self.log.info("Connecting")
+            logger.info("Connecting")
             self.connect()
 
     def get_last_touch_screen(self) -> int:
@@ -547,7 +545,7 @@ class AdbConnection:
         """
         res = self.run_cmd(f"push {src} {dst}", timeout=timeout)
         if res.return_code != 0:
-            self.log.error(f"Failed to push file: {res.stderr}")
+            logger.error(f"Failed to push file: {res.stderr}")
 
     def pull_file(self, src: str, dst: str, timeout: int = 60) -> None:
         """
@@ -559,7 +557,7 @@ class AdbConnection:
         """
         res = self.run_cmd(f"pull {src} {dst}", timeout=timeout)
         if res.return_code != 0:
-            self.log.error(f"Failed to pull file: {res.stderr}")
+            logger.error(f"Failed to pull file: {res.stderr}")
 
     @is_root_available
     def play_notification_sound(self) -> None:
