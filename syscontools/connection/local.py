@@ -1,12 +1,22 @@
-# Copyright (c) 2024 hprombex
+# Copyright (c) 2024-2025 hprombex
 #
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-# THE SOFTWARE.
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+# IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+# DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+# OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+# OR OTHER DEALINGS IN THE SOFTWARE.
 #
 # Author: hprombex
 
@@ -17,6 +27,7 @@ This module defines the LocalConnection class, which provides functionality for
 executing commands and operations directly on the local machine.
 """
 
+import logging
 import shlex
 from importlib import import_module
 from subprocess import PIPE, STDOUT, Popen
@@ -28,8 +39,10 @@ from connection.utils import (
     ExeProc,
     prepare_cwd_for_cmd,
 )
-from exceptions import UnsupportedOSException
-from lsLog import Log
+from custom_exceptions import UnsupportedOSException
+
+
+logger = logging.getLogger(__name__)
 
 
 class AutoImportModule:
@@ -65,19 +78,12 @@ class LocalConnection:
     drwxr-xr-x    1 root     root        4.0K Sep 28 23:44 ..
     """
 
-    def __init__(self, ip: str = "localhost", logger: Log = None) -> None:
+    def __init__(self, ip: str = "localhost") -> None:
         """
         Initialize a LocalConnection instance.
 
         :param ip: The IP address of the local machine, defaults to 'localhost'.
-        :param logger: Optional logger instance for logging activities.
-            If none is provided, a default logger will be initialized.
         """
-        if logger:
-            self.log = logger
-        else:
-            self.log = Log(store=False, timestamp=True)
-
         self._ip: str = str(ip)
         self._module: AutoImportModule | None = None
         self._enable_sudo: bool = False
@@ -157,7 +163,7 @@ class LocalConnection:
         )
 
         if not quiet_mode:
-            self.log.debug(f'Host: {self._ip}  cmd: "{cmd}" cwd: {cwd}')
+            logger.debug(f'Host: {self._ip}  cmd: "{cmd}" cwd: {cwd}')
 
         if self._host_os_type == OsType.WINDOWS:
             shell = True
@@ -182,12 +188,12 @@ class LocalConnection:
         if stdout:
             decoded_stdout = stdout.decode("utf-8", "ignore")
             if decoded_stdout and not quiet_mode:
-                self.log.out(f"output: \nstdout>>\n{decoded_stdout}")
+                logger.debug(f"output: \nstdout>>\n{decoded_stdout}")
 
         if stderr:
             decoded_stderr = stderr.decode("utf-8", "ignore")
             if decoded_stderr and not quiet_mode:
-                self.log.out(f"output: \nstderr>>\n{decoded_stderr}")
+                logger.debug(f"output: \nstderr>>\n{decoded_stderr}")
 
         if sudo:
             self._enable_sudo = False
@@ -280,7 +286,7 @@ class LocalConnection:
                is not supported, so SHELL mode is enforced.
         """
         if not quiet_mode:
-            self.log.debug(f'Host: {self._ip}  cmd: "{cmd}" cwd: {cwd}')
+            logger.debug(f'Host: {self._ip}  cmd: "{cmd}" cwd: {cwd}')
 
         if cwd and self._host_os_type == OsType.WINDOWS:
             # Windows does not support non-shell mode or changing the working
