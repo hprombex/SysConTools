@@ -1,12 +1,22 @@
-# Copyright (c) 2024 hprombex
+# Copyright (c) 2024-2025 hprombex
 #
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-# THE SOFTWARE.
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+# IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+# DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+# OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+# OR OTHER DEALINGS IN THE SOFTWARE.
 #
 # Author: hprombex
 
@@ -16,8 +26,7 @@ import re
 import requests
 from enum import Enum
 
-from exceptions import HomeAssistantError
-from lsLog import Log
+from custom_exceptions import HomeAssistantError
 
 
 class EntityType(str, Enum):
@@ -92,23 +101,17 @@ class HaApiCall(Enum):
 class HomeAssistantAPI:
     """A class to interact with the Home Assistant API."""
 
-    def __init__(self, base_url: str, token: str, logger: "Log" = None):
+    def __init__(self, base_url: str, token: str):
         """
         Initialize the Home Assistant API client.
 
         :param base_url: The base URL of the Home Assistant instance,
             e.g., http://homeassistant.local:8123.
         :param token: The long-lived access token for authenticating API requests.
-        :param logger: Optional logger instance for logging API interactions.
             If not provided, a default logger is used.
         """
         self._base_url = self._normalize_base_url(base_url)
         self._token = token
-
-        if logger:
-            self.log = logger
-        else:
-            self.log = Log(store=False, timestamp=True)
 
     def _api_call(
         self, action: HaApiCall, entity: str, data: dict[str, str] = None
