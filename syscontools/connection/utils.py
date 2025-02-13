@@ -1,25 +1,39 @@
-# Copyright (c) 2024 hprombex
+# Copyright (c) 2024-2025 hprombex
 #
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-# THE SOFTWARE.
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+# IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+# DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+# OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+# OR OTHER DEALINGS IN THE SOFTWARE.
 #
 # Author: hprombex
 
 """Utils for SSH connection and Local connection."""
 
 import codecs
+import logging
 from dataclasses import dataclass
 from enum import StrEnum
+from functools import wraps
+from typing import Callable, Any
 from subprocess import CompletedProcess, Popen
-
 from paramiko.channel import ChannelFile, Channel
 
-from exceptions import CmdValidationError
+from custom_exceptions import CmdValidationError
+
+logger = logging.getLogger(__name__)
 
 
 class OsType(StrEnum):
@@ -115,7 +129,7 @@ class Subscription:
     encoding: str | None = "utf-8"
 
 
-def check_connection(func):
+def check_connection(func: Callable) -> Callable:
     """
     Decorator that ensures an active connection before executing the decorated function.
 
@@ -127,7 +141,8 @@ def check_connection(func):
     :return: The result of the decorated function.
     """
 
-    def wrapper(self, *args, **kwargs):
+    @wraps(func)
+    def wrapper(self, *args, **kwargs) -> Any:
         if not self.connected:
             self.connect()
         result = func(self, *args, **kwargs)
@@ -136,7 +151,30 @@ def check_connection(func):
     return wrapper
 
 
-def is_root_available(func):
+def session_wrapper(func: Callable) -> Callable:
+    """
+    A decorator to ensure that a session is properly managed around the execution of the wrapped function.
+
+    This decorator calls `self.login()` before executing the wrapped function and ensures
+    `self.logout()` is called afterward, regardless of whether an exception occurs.
+
+    :param func: The function to be wrapped and executed within a managed session.
+    :return: The wrapped function with session management.
+    """
+
+    @wraps(func)
+    def wrapper(self, *args, **kwargs) -> Any:
+        self.login()
+        try:
+            result = func(self, *args, **kwargs)
+        finally:
+            self.logout()
+        return result
+
+    return wrapper
+
+
+def is_root_available(func: Callable) -> Callable:
     """
     Decorator that checks if root permissions are available before executing a function.
     If root privileges are not available, a warning is logged.
@@ -145,9 +183,10 @@ def is_root_available(func):
     :return: The result of the decorated function, even if root permissions are not available.
     """
 
-    def wrapper(self, *args, **kwargs):
+    @wraps(func)
+    def wrapper(self, *args, **kwargs) -> Any:
         if not self.root_permissions:
-            self.log.warning(
+            logger.warning(
                 f"Root privileges are required to call {func.__name__} correctly."
             )
         result = func(self, *args, **kwargs)
