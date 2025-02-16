@@ -21,7 +21,7 @@
 # Author: hprombex
 
 """Module for Home Assistant API class."""
-
+import json
 import re
 import requests
 from enum import Enum
@@ -176,7 +176,7 @@ class HomeAssistantAPI:
         elif action == HaApiCall.GET:
             url = f"{self._base_url}api/states/{entity}"
             response = requests.get(url, headers=headers)
-            output = response.json()
+            output = json.loads(response.text.encode('ascii', 'replace'))
         else:
             raise HomeAssistantError(
                 "Invalid action. Only 'get' or 'post' are supported."
