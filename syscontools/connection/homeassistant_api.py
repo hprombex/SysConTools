@@ -165,9 +165,11 @@ class HomeAssistantAPI:
             response = requests.post(url, headers=headers, json=payload)
             json_response = response.json()
 
-            if json_response:
+            if json_response and isinstance(json_response, list):
                 # In the POST response case "requests" returns a list of dict's
                 output = json_response[0]
+            elif json_response:
+                output = json_response
             else:
                 # If the POST request doesn't change anything "request" returns an empty list
                 # eg. trying to turn OFF light with the current state in OFF
